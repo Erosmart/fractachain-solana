@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   Coins,
   Layers,
@@ -20,18 +20,14 @@ export default function Navbar() {
   const { t } = useI18n();
 
   const primaryLinks = [
-    { href: '/?tab=emision', label: t('demo.tabs.emision'), icon: Coins },
-    { href: '/?tab=primario', label: t('nav.market'), icon: Layers },
-    { href: '/?tab=orderbook', label: t('nav.orderbook'), icon: Coins },
-    { href: '/?tab=portfolio', label: t('nav.portfolio'), icon: Building2 },
+    { href: '/emision', label: t('demo.tabs.emision'), icon: Coins },
+    { href: '/licitaciones', label: t('nav.market'), icon: Layers },
+    { href: '/orderbook', label: t('nav.orderbook'), icon: Coins },
+    { href: '/portfolio', label: t('nav.portfolio'), icon: Building2 },
   ];
 
-  const searchParams = useSearchParams();
-  const currentDemoTab = searchParams.get('tab') ?? 'emision';
   const linkActive = (href: string) =>
-    href.startsWith('/?tab=')
-      ? pathname === '/' && href === `/?tab=${currentDemoTab}`
-      : pathname === href || pathname.startsWith(`${href}/`);
+    pathname === href || pathname.startsWith(`${href}/`);
 
   const allLinks = primaryLinks;
   const closeMenu = () => setMobileMenuOpen(false);

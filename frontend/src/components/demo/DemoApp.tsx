@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, type ReactNode } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import type { ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Wallet, ShieldCheck, RotateCcw, Zap, Landmark, BookOpen,
   Briefcase, Rocket,
@@ -16,23 +16,27 @@ import PrimarioPanel from './PrimarioPanel';
 import OrderbookPanel from './OrderbookPanel';
 import PortfolioPanel from './PortfolioPanel';
 
-type Tab = 'emision' | 'primario' | 'orderbook' | 'portfolio';
+export type DemoTab = 'emision' | 'primario' | 'orderbook' | 'portfolio';
 
-const TABS: { id: Tab; icon: ReactNode }[] = [
+const TAB_ROUTES: Record<DemoTab, string> = {
+  emision: '/emision',
+  primario: '/licitaciones',
+  orderbook: '/orderbook',
+  portfolio: '/portfolio',
+};
+
+const TABS: { id: DemoTab; icon: ReactNode }[] = [
   { id: 'emision', icon: <Landmark size={15} /> },
   { id: 'primario', icon: <Rocket size={15} /> },
   { id: 'orderbook', icon: <BookOpen size={15} /> },
   { id: 'portfolio', icon: <Briefcase size={15} /> },
 ];
 
-function DemoInner() {
+export default function DemoApp({ tab }: { tab: DemoTab }) {
   const s = useDemoState();
   const { t } = useI18n();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const tabParam = searchParams.get('tab');
-  const tab: Tab = TABS.some((x) => x.id === tabParam) ? (tabParam as Tab) : 'emision';
-  const setTab = (id: Tab) => router.replace(`/?tab=${id}`, { scroll: false });
+  const setTab = (id: DemoTab) => router.push(TAB_ROUTES[id]);
   const w = s.wallet;
 
   return (
@@ -136,13 +140,5 @@ function DemoInner() {
         {tab === 'portfolio' && <PortfolioPanel />}
       </div>
     </div>
-  );
-}
-
-export default function DemoApp() {
-  return (
-    <Suspense fallback={null}>
-      <DemoInner />
-    </Suspense>
   );
 }
