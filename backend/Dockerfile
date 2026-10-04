@@ -14,7 +14,7 @@ WORKDIR /app
 # --use-system-ca (that flag is Node 23+); its TLS stack uses the bundled Mozilla store.
 RUN apk add --no-cache ca-certificates
 ENV NODE_ENV=production
-ENV PORT=4000
+ENV PORT=8080
 COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
@@ -24,9 +24,9 @@ COPY backend/scripts ./scripts
 RUN mkdir -p data/selfies \
   && chown -R node:node /app
 USER node
-EXPOSE 4000
+EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 # pg_restore rewrites data/*.json from Postgres BEFORE the modules load them;
 # without DATABASE_URL it exits quietly and the files baked above are used.
 CMD ["sh", "-c", "node scripts/pg_restore.js && node dist/server.js"]

@@ -147,7 +147,7 @@ import fs from 'fs';
 import path from 'path';
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 8080;
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '8mb' }));

@@ -1,6 +1,6 @@
 // Fractachain Frontend API Client
 export function getApiBaseUrl(): string {
-  const fallback = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  const fallback = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
   if (typeof window === 'undefined') return fallback;
   try {
     const configured = new URL(fallback, window.location.origin);

@@ -105,6 +105,7 @@ export interface WalletState {
 export interface Candle {
   t: number; // timestamp del bucket
   o: number; h: number; l: number; c: number;
+  v?: number; // volumen del bucket
 }
 
 export interface DemoState {
@@ -300,7 +301,7 @@ function seedCandles(): Record<string, Candle[]> {
     const c = +(px + drift + (rng() - 0.48) * 0.12).toFixed(2);
     const h = Math.max(o, c) + +(rng() * 0.05).toFixed(2);
     const l = Math.min(o, c) - +(rng() * 0.05).toFixed(2);
-    out.push({ t: SEED_NOW - (n - i) * 300e3, o: +o.toFixed(2), h, l, c });
+    out.push({ t: SEED_NOW - (n - i) * 300e3, o: +o.toFixed(2), h, l, c, v: Math.round(300 + rng() * 2200) });
     px = c;
   }
   out[out.length - 1].c = end;
@@ -314,17 +315,30 @@ function freshState(): DemoState {
   };
 }
 
+/** Posición inicial para poder demoar ventas sin comprar antes. */
+const STARTER_TGGAL = 600;
+
+function grantStarter(wallet: WalletState) {
+  wallet.atas.tGGAL = true;
+  if (!wallet.holdings.tGGAL) wallet.holdings.tGGAL = { free: 0, locked: 0 };
+  if (wallet.holdings.tGGAL.free + wallet.holdings.tGGAL.locked === 0) {
+    wallet.holdings.tGGAL.free = STARTER_TGGAL;
+  }
+}
+
 function load(): DemoState {
   if (typeof window === 'undefined') return freshState();
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as DemoState;
-      // Estados viejos (pre-velas): rellenar las series que falten o estén vacías.
+      // Estados viejos (pre-velas o series muy cortas): rellenar con el seed.
       parsed.candles = parsed.candles || {};
       for (const [id, seed] of Object.entries(seedCandles())) {
-        if (!parsed.candles[id]?.length) parsed.candles[id] = seed;
+        if (!parsed.candles[id] || parsed.candles[id].length < 30) parsed.candles[id] = seed;
       }
+      // Wallets conectados de sesiones viejas: dar la posición inicial de tGGAL.
+      if (parsed.wallet?.connected) grantStarter(parsed.wallet);
       return parsed;
     }
   } catch { /* estado corrupto → re-seed */ }
@@ -368,6 +382,8 @@ export function connectWallet() {
   state.wallet.connected = true;
   if (!state.wallet.pubkey) state.wallet.pubkey = fakeKeypair();
   if (state.wallet.sol === 0) state.wallet.sol = 0.5;
+  if (state.wallet.usdc === 0) state.wallet.usdc = 5000;
+  grantStarter(state.wallet);
   emit();
 }
 
@@ -521,7 +537,7 @@ export function getCandles(listingId: string): Candle[] {
 }
 
 /** Actualiza la vela corriente (buckets de 1 min) con cada fill. */
-function recordCandle(listingId: string, price: number) {
+function recordCandle(listingId: string, price: number, amount = 0) {
   state.candles ||= {};
   const arr = (state.candles[listingId] ||= []);
   const bucket = Math.floor(Date.now() / 60e3) * 60e3;
@@ -530,10 +546,26 @@ function recordCandle(listingId: string, price: number) {
     last.h = Math.max(last.h, price);
     last.l = Math.min(last.l, price);
     last.c = price;
+    last.v = (last.v || 0) + amount;
   } else {
-    arr.push({ t: bucket, o: price, h: price, l: price, c: price });
+    arr.push({ t: bucket, o: price, h: price, l: price, c: price, v: amount });
   }
   if (arr.length > 90) arr.shift();
+}
+
+/** Liquida el lado maker de un fill cuando la orden es del usuario. */
+function settleMaker(maker: Order, fillPx: number, fill: number, tk: string) {
+  maker.remaining -= fill;
+  if (maker.owner !== 'me') return;
+  const w = state.wallet;
+  const h = (w.holdings[tk] ||= { free: 0, locked: 0 });
+  if (maker.side === 'BUY') {
+    w.usdcLocked = Math.max(0, w.usdcLocked - fillPx * fill);
+    h.free += fill;
+  } else {
+    h.locked = Math.max(0, h.locked - fill);
+    w.usdc += fillPx * fill;
+  }
 }
 
 export function placeOrder(
@@ -578,14 +610,14 @@ export function placeOrder(
     if (remaining <= 0) break;
     const fill = Math.min(remaining, maker.remaining);
     const fillPx = maker.price; // price-time priority: ejecuta al precio del maker
-    maker.remaining -= fill;
+    settleMaker(maker, fillPx, fill, tk);
     remaining -= fill;
     state.trades.push({
       id: `t-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       listingId, price: fillPx, amount: fill, takerSide: side,
       sig: fakeSig(), createdAt: Date.now(),
     });
-    recordCandle(listingId, fillPx);
+    recordCandle(listingId, fillPx, fill);
     if (side === 'BUY') {
       paidOut += fillPx * fill;
       h.free += fill; // recibe los tokens del maker
@@ -635,18 +667,43 @@ export function cancelOrder(orderId: string): DemoError | null {
   return null;
 }
 
-/** Bot de mercado: agrega una orden aleatoria para animar el demo. */
+/** Bot de mercado: agrega una orden que cruza el libro y genera trades/velas. */
 export function simulateMarket(listingId: string) {
   const l = state.listings.find((x) => x.id === listingId);
   if (!l || l.status !== 'CLOSED_SUCCESS') return;
+  const tk = l.dossier.tokenTicker;
   const base = l.lastPrice || l.dossier.pricePerShareUsdc;
   const side: 'BUY' | 'SELL' = Math.random() < 0.5 ? 'BUY' : 'SELL';
   const px = +(base * (1 + (Math.random() * 0.06 - 0.03))).toFixed(2);
   const amount = [100, 250, 500, 800, 1200][Math.floor(Math.random() * 5)];
-  state.orders.push({
+  const bot: Order = {
     id: `o-bot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     listingId, side, price: px, amount, remaining: amount,
     owner: 'bot', createdAt: Date.now(),
-  });
+  };
+
+  // Cruza contra el book (incluye órdenes del usuario) antes de postear.
+  const contra = state.orders
+    .filter((o) => o.listingId === listingId && o.remaining > 0 &&
+      o.side !== side &&
+      (side === 'BUY' ? o.price <= px : o.price >= px))
+    .sort((a, b) =>
+      side === 'BUY' ? a.price - b.price || a.createdAt - b.createdAt
+                     : b.price - a.price || a.createdAt - b.createdAt);
+  for (const maker of contra) {
+    if (bot.remaining <= 0) break;
+    const fill = Math.min(bot.remaining, maker.remaining);
+    const fillPx = maker.price;
+    settleMaker(maker, fillPx, fill, tk);
+    bot.remaining -= fill;
+    state.trades.push({
+      id: `t-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      listingId, price: fillPx, amount: fill, takerSide: side,
+      sig: fakeSig(), createdAt: Date.now(),
+    });
+    recordCandle(listingId, fillPx, fill);
+    l.lastPrice = fillPx;
+  }
+  if (bot.remaining > 0) state.orders.push(bot);
   emit();
 }
