@@ -24,15 +24,15 @@ export default function Footer() {
             <div>
               <h4 className="font-display font-extrabold text-black text-xs tracking-wider uppercase mb-3">{t('footer.markets')}</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/market" className="hover:text-black">{t('nav.market')}</Link></li>
-                <li><Link href="/orderbook" className="hover:text-black">{t('nav.orderbook')}</Link></li>
+                <li><Link href="/demo?tab=primario" className="hover:text-black">{t('nav.market')}</Link></li>
+                <li><Link href="/demo?tab=orderbook" className="hover:text-black">{t('nav.orderbook')}</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-display font-extrabold text-black text-xs tracking-wider uppercase mb-3">{t('footer.platform')}</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/dashboard" className="hover:text-black">{t('nav.portfolio')}</Link></li>
-                <li><Link href="/wallet" className="hover:text-black">{t('nav.wallet')}</Link></li>
+                <li><Link href="/demo?tab=portfolio" className="hover:text-black">{t('nav.portfolio')}</Link></li>
+                <li><Link href="/demo" className="hover:text-black">Demo</Link></li>
                 <li><Link href="/login" className="hover:text-black">{t('nav.login')}</Link></li>
               </ul>
             </div>
@@ -40,8 +40,7 @@ export default function Footer() {
             <div>
               <h4 className="font-display font-extrabold text-black text-xs tracking-wider uppercase mb-3">Admin</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/admin/issuance" className="hover:text-black">{t('nav.issuance')}</Link></li>
-                <li><Link href="/admin/kyc" className="hover:text-black">{t('nav.kyc')}</Link></li>
+                <li><Link href="/demo?tab=emision" className="hover:text-black">{t('nav.issuance')}</Link></li>
               </ul>
             </div>
             )}

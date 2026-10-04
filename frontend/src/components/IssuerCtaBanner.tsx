@@ -17,7 +17,7 @@ export default function IssuerCtaBanner() {
           </p>
         </div>
         <Link
-          href="/login?next=/admin/issuance"
+          href="/demo?tab=emision"
           className="w-full sm:w-auto shrink-0 justify-center px-6 py-3.5 rounded-2xl bg-black text-white font-display font-bold text-sm inline-flex items-center gap-2"
         >
           <Building2 className="w-4 h-4" />

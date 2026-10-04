@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
   Coins,
   Layers,
@@ -10,16 +10,13 @@ import {
   Building2,
   Menu,
   X,
-  Wallet,
   Activity,
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 import BrandMark from './BrandMark';
-import WalletAddress from './WalletAddress';
 import { LangToggle, ThemeToggle } from './UiToggles';
-import { formatAmount } from '../lib/format';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -28,10 +25,17 @@ export default function Navbar() {
   const { t } = useI18n();
 
   const primaryLinks = [
-    { href: '/market', label: t('nav.market'), icon: Layers },
-    { href: '/orderbook', label: t('nav.orderbook'), icon: Coins },
-    { href: '/dashboard', label: t('nav.portfolio'), icon: Building2 },
+    { href: '/demo?tab=primario', label: t('nav.market'), icon: Layers },
+    { href: '/demo?tab=orderbook', label: t('nav.orderbook'), icon: Coins },
+    { href: '/demo?tab=portfolio', label: t('nav.portfolio'), icon: Building2 },
   ];
+
+  const searchParams = useSearchParams();
+  const currentDemoTab = searchParams.get('tab') ?? 'emision';
+  const linkActive = (href: string) =>
+    href.startsWith('/demo')
+      ? pathname === '/demo' && href === `/demo?tab=${currentDemoTab}`
+      : pathname === href || pathname.startsWith(`${href}/`);
 
   const adminLinks = [
     { href: '/admin/issuance', label: t('nav.issuance'), icon: Coins },
@@ -50,7 +54,7 @@ export default function Navbar() {
 
           <div className="hidden xl:flex items-center gap-0.5 2xl:gap-1 flex-1 min-w-0">
             {allLinks.map((link) => {
-              const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
+              const isActive = linkActive(link.href);
               return (
                 <Link
                   key={link.href}
@@ -69,20 +73,9 @@ export default function Navbar() {
             <LangToggle />
             <ThemeToggle />
             <div className="hidden sm:flex items-center gap-2">
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-black/10 bg-white/70 text-black text-xs font-display font-bold"
-              >
-                <Wallet className="w-3.5 h-3.5 shrink-0" />
-                <span className="whitespace-nowrap">
-                  {user?.publicKey
-                    ? `${formatAmount(Number(user.xlmBalance || 0), 2)} SOL`
-                    : t('nav.portfolio')}
-                </span>
-              </Link>
               {user ? (
                 <div className="flex items-center gap-1.5 pl-2 border-l border-black/10 min-w-0">
-                  <Link href="/dashboard" className="text-xs font-display font-bold text-black max-w-[6.5rem] 2xl:max-w-[9rem] truncate">
+                  <Link href="/demo?tab=portfolio" className="text-xs font-display font-bold text-black max-w-[6.5rem] 2xl:max-w-[9rem] truncate">
                     {user.name}
                   </Link>
                   <button type="button" onClick={logout} className="p-1.5 rounded-lg text-neutral-500 hover:text-black shrink-0" aria-label={t('nav.logout')}>
@@ -98,13 +91,6 @@ export default function Navbar() {
                 </Link>
               )}
             </div>
-            <Link
-              href="/dashboard"
-              className="sm:hidden p-2 rounded-lg text-black"
-              aria-label={t('nav.portfolio')}
-            >
-              <Wallet className="w-5 h-5" />
-            </Link>
             <button
               type="button"
               className="xl:hidden p-2 text-black"
@@ -120,15 +106,9 @@ export default function Navbar() {
 
       {mobileMenuOpen && (
         <div className="xl:hidden border-t border-black/10 px-3 sm:px-4 pt-2 pb-4 space-y-1 bg-white/95 max-h-[min(80vh,32rem)] overflow-y-auto">
-          {user?.publicKey && (
-            <div className="px-3 py-2">
-              <p className="text-[10px] uppercase text-neutral-500 mb-1">{t('nav.yourWallet')}</p>
-              <WalletAddress address={user.publicKey} compact />
-            </div>
-          )}
           {allLinks.map((link) => {
             const Icon = link.icon;
-            const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
+            const isActive = linkActive(link.href);
             return (
               <Link
                 key={link.href}
@@ -145,20 +125,10 @@ export default function Navbar() {
           })}
 
           <div className="pt-2 mt-2 border-t border-black/10 space-y-1 sm:hidden">
-            <Link
-              href="/dashboard"
-              onClick={closeMenu}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-display font-bold text-neutral-700 hover:bg-black/5"
-            >
-              <Wallet className="w-4 h-4 shrink-0" />
-              {user?.publicKey
-                ? `${formatAmount(Number(user.xlmBalance || 0), 2)} SOL`
-                : t('nav.portfolio')}
-            </Link>
             {user ? (
               <>
                 <Link
-                  href="/dashboard"
+                  href="/demo?tab=portfolio"
                   onClick={closeMenu}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-display font-bold text-neutral-700 hover:bg-black/5 truncate"
                 >

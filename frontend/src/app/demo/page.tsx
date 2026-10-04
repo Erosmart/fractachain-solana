@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Wallet, ShieldCheck, RotateCcw, Zap, Landmark, BookOpen,
   Briefcase, Rocket,
@@ -24,10 +25,14 @@ const TABS: { id: Tab; icon: ReactNode }[] = [
   { id: 'portfolio', icon: <Briefcase size={15} /> },
 ];
 
-export default function DemoPage() {
+function DemoInner() {
   const s = useDemoState();
   const { t } = useI18n();
-  const [tab, setTab] = useState<Tab>('emision');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const tab: Tab = TABS.some((x) => x.id === tabParam) ? (tabParam as Tab) : 'emision';
+  const setTab = (id: Tab) => router.replace(`/demo?tab=${id}`, { scroll: false });
   const w = s.wallet;
 
   return (
@@ -131,5 +136,13 @@ export default function DemoPage() {
         {tab === 'portfolio' && <PortfolioPanel />}
       </div>
     </div>
+  );
+}
+
+export default function DemoPage() {
+  return (
+    <Suspense fallback={null}>
+      <DemoInner />
+    </Suspense>
   );
 }

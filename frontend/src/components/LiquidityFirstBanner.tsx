@@ -44,7 +44,7 @@ export default function LiquidityFirstBanner() {
             <Sparkles className="w-4 h-4 shrink-0" /> Argentina Builder Challenge
           </span>
           <div className="flex flex-wrap gap-2 sm:gap-3">
-            <Link href="/orderbook" className="flex-1 sm:flex-none justify-center px-5 py-2.5 btn-lcd btn-lcd-solid text-xs">
+            <Link href="/demo?tab=orderbook" className="flex-1 sm:flex-none justify-center px-5 py-2.5 btn-lcd btn-lcd-solid text-xs">
               {messages.nav.orderbook} <ArrowRight className="w-3.5 h-3.5" />
             </Link>
 
