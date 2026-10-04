@@ -4,11 +4,9 @@ import React from 'react';
 import Link from 'next/link';
 import { Lock } from 'lucide-react';
 import BrandMark from './BrandMark';
-import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 
 export default function Footer() {
-  const { user } = useAuth();
   const { t } = useI18n();
   return (
     <footer className="relative z-10 border-t border-black/10 pt-8 sm:pt-14 pb-8 sm:pb-10 text-neutral-600 text-sm">
@@ -20,30 +18,22 @@ export default function Footer() {
               {t('footer.blurb')} <strong className="text-black">Solana</strong>.
             </p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-8">
+          <div className="grid grid-cols-2 gap-8">
             <div>
               <h4 className="font-display font-extrabold text-black text-xs tracking-wider uppercase mb-3">{t('footer.markets')}</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/demo?tab=primario" className="hover:text-black">{t('nav.market')}</Link></li>
-                <li><Link href="/demo?tab=orderbook" className="hover:text-black">{t('nav.orderbook')}</Link></li>
+                <li><Link href="/?tab=emision" className="hover:text-black">{t('nav.issuance')}</Link></li>
+                <li><Link href="/?tab=primario" className="hover:text-black">{t('nav.market')}</Link></li>
+                <li><Link href="/?tab=orderbook" className="hover:text-black">{t('nav.orderbook')}</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-display font-extrabold text-black text-xs tracking-wider uppercase mb-3">{t('footer.platform')}</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/demo?tab=portfolio" className="hover:text-black">{t('nav.portfolio')}</Link></li>
-                <li><Link href="/demo" className="hover:text-black">Demo</Link></li>
-                <li><Link href="/login" className="hover:text-black">{t('nav.login')}</Link></li>
+                <li><Link href="/?tab=portfolio" className="hover:text-black">{t('nav.portfolio')}</Link></li>
+                <li><Link href="/" className="hover:text-black">Demo</Link></li>
               </ul>
             </div>
-            {user?.isAdmin && (
-            <div>
-              <h4 className="font-display font-extrabold text-black text-xs tracking-wider uppercase mb-3">Admin</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link href="/demo?tab=emision" className="hover:text-black">{t('nav.issuance')}</Link></li>
-              </ul>
-            </div>
-            )}
           </div>
         </div>
         <div className="p-4 rounded-2xl crystal-card mb-8">

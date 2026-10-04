@@ -32,7 +32,7 @@ function DemoInner() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
   const tab: Tab = TABS.some((x) => x.id === tabParam) ? (tabParam as Tab) : 'emision';
-  const setTab = (id: Tab) => router.replace(`/demo?tab=${id}`, { scroll: false });
+  const setTab = (id: Tab) => router.replace(`/?tab=${id}`, { scroll: false });
   const w = s.wallet;
 
   return (
@@ -139,7 +139,7 @@ function DemoInner() {
   );
 }
 
-export default function DemoPage() {
+export default function DemoApp() {
   return (
     <Suspense fallback={null}>
       <DemoInner />
