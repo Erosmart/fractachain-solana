@@ -22,15 +22,15 @@ export default function Footer() {
             <div>
               <h4 className="font-display font-extrabold text-black text-xs tracking-wider uppercase mb-3">{t('footer.markets')}</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/?tab=emision" className="hover:text-black">{t('nav.issuance')}</Link></li>
-                <li><Link href="/?tab=primario" className="hover:text-black">{t('nav.market')}</Link></li>
-                <li><Link href="/?tab=orderbook" className="hover:text-black">{t('nav.orderbook')}</Link></li>
+                <li><Link href="/emision" className="hover:text-black">{t('nav.issuance')}</Link></li>
+                <li><Link href="/licitaciones" className="hover:text-black">{t('nav.market')}</Link></li>
+                <li><Link href="/orderbook" className="hover:text-black">{t('nav.orderbook')}</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-display font-extrabold text-black text-xs tracking-wider uppercase mb-3">{t('footer.platform')}</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/?tab=portfolio" className="hover:text-black">{t('nav.portfolio')}</Link></li>
+                <li><Link href="/portfolio" className="hover:text-black">{t('nav.portfolio')}</Link></li>
                 <li><Link href="/" className="hover:text-black">Demo</Link></li>
               </ul>
             </div>

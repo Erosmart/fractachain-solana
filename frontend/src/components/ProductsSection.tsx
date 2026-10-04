@@ -3,7 +3,7 @@ import { ArrowRight, ShoppingBasket, LineChart, Landmark, Info } from 'lucide-re
 import { getServerMessages } from '../lib/i18n-server';
 
 const ICONS = [ShoppingBasket, LineChart, Landmark];
-const HREFS: (string | null)[] = [null, '/?tab=primario', null];
+const HREFS: (string | null)[] = [null, '/licitaciones', null];
 
 export default function ProductsSection() {
   const messages = getServerMessages();
