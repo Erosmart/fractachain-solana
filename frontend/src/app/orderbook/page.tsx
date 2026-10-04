@@ -45,9 +45,9 @@ type Book = {
   myOrders: MyOrder[];
   reservedCash?: number;
   reservedTokens?: number;
-  /** 'sdex' is the real Stellar order book; 'sandbox' is the local matcher. */
+  /** 'sdex' is the on-chain order book (Manifest on Solana); 'sandbox' is the local matcher. */
   venue: 'sdex' | 'sandbox';
-  /** SDEX only: whether the issuer has authorized this holder's trustline. */
+  /** On-chain book only: whether the token program has thawed this holder's ATA. */
   authorized?: boolean;
   needsTrustline?: boolean;
   tokenBalance?: number;
@@ -56,7 +56,7 @@ type Book = {
   tokenTotal?: number;
 };
 
-/** Shape returned by /api/sdex/:id, before we fold it into `Book`. */
+/** Shape returned by /api/dex/:id, before we fold it into `Book`. */
 type SdexLevel = { price: number; amount: number; total: number; legacy?: boolean };
 type SdexOffer = {
   id: string;
@@ -68,11 +68,11 @@ type SdexOffer = {
 };
 
 /**
- * Folds an SDEX response into the shape the book UI already renders.
+ * Folds an on-chain book response into the shape the book UI already renders.
  *
- * Two mismatches to reconcile: SDEX reports `total` as a cumulative quantity
+ * Two mismatches to reconcile: the on-chain book reports `total` as a cumulative quantity
  * while the sandbox reports it as a notional value, and SDEX has no depth
- * percentage because Horizon does not compute one.
+ * percentage because the chain does not compute one.
  */
 function fromSdex(d: any): Book {
   const level = (rows: SdexLevel[]): Level[] => {
@@ -161,8 +161,8 @@ function OrderbookInner() {
   const holding = user?.holdings?.find((h) => h.listingId === listingId);
   const onSdex = book?.venue === 'sdex';
 
-  // On SDEX the ledger is the authority, not our database: the trustline's
-  // authorized flag is literally what decides whether Stellar accepts the
+  // On-chain the ledger is the authority, not our database: the ATA's
+  // frozen/thawed flag is literally what decides whether the token program accepts the
   // order, so reading anything else would let the UI promise a trade the
   // network will reject.
   const approved = onSdex ? Boolean(book?.authorized) : user?.kycStatus === 'APPROVED';
@@ -176,9 +176,9 @@ function OrderbookInner() {
   };
 
   /**
-   * Prefers the real Stellar order book and falls back to the local matcher.
+   * Prefers the real on-chain order book and falls back to the local matcher.
    *
-   * SDEX only answers for listings that already have an issuing account on the
+   * The on-chain book only answers for listings that already have a live mint on
    * network, so a demo running without testnet keys still gets a working book
    * instead of an error.
    */
@@ -236,7 +236,7 @@ function OrderbookInner() {
   const reservedCash = book?.reservedCash ?? 0;
   const reservedTokens = book?.reservedTokens ?? 0;
 
-  // On SDEX the spendable balance lives on-chain: the backend already nets out
+  // On-chain the spendable balance lives in the market: the backend already nets out
   // what resting offers have locked (liabilities), so use it as-is. Sandbox
   // books keep using the platform ledger minus reserved cash.
   const freeCash = onSdex
@@ -274,9 +274,9 @@ function OrderbookInner() {
     const onSdex = book?.venue === 'sdex';
     try {
       if (onSdex && isSelfCustody(user)) {
-        // La orden sale de la wallet del inversor, así que la firma Freighter
+        // La orden sale de la wallet del inversor, así que la firma la wallet
         // y el backend solo la retransmite.
-        setNotice(t('ob.signInFreighter'));
+        setNotice(t('ob.signInPhantom'));
         const prepared = await postJson<{ xdr: string }>(
           `/api/sdex/${listingId}/orders/prepare`,
           token,
@@ -286,7 +286,7 @@ function OrderbookInner() {
         setTaken(null);
         await refreshUser();
         await loadBook(listingId);
-        setNotice(t('ob.sentSdex', { hash: String(relayed?.hash || '').slice(0, 12) }));
+        setNotice(t('ob.sentManifest', { hash: String(relayed?.hash || '').slice(0, 12) }));
         return;
       }
       const res = await fetch(
@@ -299,7 +299,7 @@ function OrderbookInner() {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          // SDEX names the size `quantity`; the sandbox book calls it `amount`.
+          // The on-chain book names the size `quantity`; the sandbox book calls it `amount`.
           body: JSON.stringify(onSdex ? { side, price, quantity: amount } : { side, price, amount }),
         },
       );
@@ -310,7 +310,7 @@ function OrderbookInner() {
 
       if (onSdex) {
         setBook(fromSdex(json.data.book));
-        setNotice(t('ob.sentSdex', { hash: String(json.data.hash).slice(0, 12) }));
+        setNotice(t('ob.sentManifest', { hash: String(json.data.hash).slice(0, 12) }));
       } else {
         setBook({
           ...json.data.book,
@@ -330,7 +330,7 @@ function OrderbookInner() {
 
   const cancel = async (id: string) => {
     if (book?.venue === 'sdex') {
-      // On SDEX a cancel is an offer for zero, so it needs the original side
+      // On the on-chain book a cancel needs the original side
       // and price to identify and zero out the resting offer.
       const mine = book.myOrders.find((o) => o.id === id);
       if (!mine) return;
@@ -397,11 +397,11 @@ function OrderbookInner() {
         <div>
           <p className="font-lcd text-[11px] uppercase tracking-[0.2em] text-neutral-500">{t('ob.kicker')}</p>
           <h1 className="text-2xl sm:text-3xl font-extrabold font-display">
-            {onSdex ? t('ob.titleSdex') : t('ob.titleLocal')}
+            {onSdex ? t('ob.titleManifest') : t('ob.titleLocal')}
           </h1>
           <p className="text-neutral-600 mt-1 max-w-xl">
             {onSdex
-              ? t('ob.descSdex')
+              ? t('ob.descManifest')
               : book
                 ? t('ob.descLocal')
                 : t('ob.descNone')}
@@ -409,7 +409,7 @@ function OrderbookInner() {
         </div>
         <div className="flex items-center gap-2 px-3 py-2 rounded-2xl crystal-card text-sm">
           <ShieldCheck className="w-4 h-4" />
-          {onSdex ? t('ob.badgeSdex') : t('ob.badgeLocal')}
+          {onSdex ? t('ob.badgeManifest') : t('ob.badgeLocal')}
         </div>
       </div>
 
@@ -642,7 +642,7 @@ function OrderbookInner() {
               )}
               {needsTrustline && (
                 <div className="px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs space-y-2">
-                  <p>{t('ob.needTrustline', { code: book.tokenTicker })}</p>
+                  <p>{t('ob.needAta', { code: book.tokenTicker })}</p>
                   <button
                     type="button"
                     onClick={async () => {

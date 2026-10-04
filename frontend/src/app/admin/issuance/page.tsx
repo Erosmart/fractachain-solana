@@ -367,7 +367,7 @@ export default function AdminIssuancePage() {
             {l.finalizeHash && (
               <p className="text-[11px] font-mono break-all">
                 finalize{' '}
-                <a href={`https://stellar.expert/explorer/testnet/tx/${l.finalizeHash}`} target="_blank" rel="noreferrer" className="underline">
+                <a href={`https://explorer.solana.com/tx/${l.finalizeHash}?cluster=devnet`} target="_blank" rel="noreferrer" className="underline">
                   {l.finalizeHash}
                 </a>
               </p>
@@ -451,7 +451,7 @@ export default function AdminIssuancePage() {
                     className="px-3 py-2 rounded-xl border border-black/10 text-xs font-bold disabled:opacity-40"
                   >
                     {l.dossier.paymentKind === 'XLM'
-                      ? t('admIss.finalizeXlm')
+                      ? t('admIss.finalizeOnchain')
                       : t('admIss.closeNow', { n: l.dossier.offeringSoftCapUsdc })}
                   </button>
                 </>

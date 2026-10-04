@@ -23,8 +23,8 @@ export default function AdminTestnetPage() {
   const { t } = useI18n();
   const [mode, setMode] = useState<'local' | 'faucet' | 'deploy'>('deploy');
   const [friendbot, setFriendbot] = useState(true);
-  const [horizonUrl, setHorizonUrl] = useState('https://horizon-testnet.stellar.org');
-  const [rpcUrl, setRpcUrl] = useState('https://soroban-testnet.stellar.org');
+  const [horizonUrl, setHorizonUrl] = useState('https://api.devnet.solana.com');
+  const [rpcUrl, setRpcUrl] = useState('https://api.devnet.solana.com');
   const [notice, setNotice] = useState('');
   const [settlePolicy, setSettlePolicy] = useState<'ON_MIN' | 'ON_DATE'>('ON_MIN');
   const [settleAt, setSettleAt] = useState('');
@@ -102,7 +102,7 @@ export default function AdminTestnetPage() {
   return (
     <div className="max-w-2xl space-y-6 py-6">
       <div>
-        <p className="font-lcd text-[11px] uppercase tracking-[0.2em] text-neutral-500">Stellar</p>
+        <p className="font-lcd text-[11px] uppercase tracking-[0.2em] text-neutral-500">Solana</p>
         <h1 className="text-3xl font-extrabold font-display">{t('admTest.title')}</h1>
         <p className="text-neutral-600 mt-1">
           {t('admTest.lead')}
@@ -118,14 +118,14 @@ export default function AdminTestnetPage() {
               [t('market.licitacion'), deployment.licitacion],
               [t('admTest.issuer'), deployment.issuer],
               ['Deployer', deployment.deployer],
-              ['USDC SAC', deployment.usdcSac],
+              ['USDC mint', deployment.usdcSac],
             ].map(([label, value]) =>
               value ? (
                 <div key={label}>
                   <dt className="text-neutral-500 font-sans">{label}</dt>
                   <dd>
-                    {String(value).startsWith('C') ? (
-                      <a className="underline" href={`https://stellar.expert/explorer/testnet/contract/${value}`} target="_blank" rel="noreferrer">
+                    {/^[1-9A-HJ-NP-Za-km-z]{32,64}$/.test(String(value)) ? (
+                      <a className="underline" href={`https://explorer.solana.com/address/${value}?cluster=devnet`} target="_blank" rel="noreferrer">
                         {value}
                       </a>
                     ) : (
@@ -138,7 +138,7 @@ export default function AdminTestnetPage() {
           </dl>
         ) : (
           <p className="text-sm text-neutral-600">
-            {t('admTest.runHere')} <code>bash scripts/testnet/01-keys.sh && bash scripts/testnet/02-build.sh && bash scripts/testnet/03-deploy.sh</code>
+            {t('admTest.runHere')} <code>bash scripts/devnet/01-keys.sh && bash scripts/devnet/02-build.sh && bash scripts/devnet/03-deploy.sh</code>
           </p>
         )}
         <button type="button" onClick={configureIssuer} className="px-4 py-2 rounded-2xl border border-black/15 font-display font-bold text-sm">
@@ -183,14 +183,14 @@ export default function AdminTestnetPage() {
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={friendbot} onChange={(e) => setFriendbot(e.target.checked)} />
-          {t('admTest.friendbot')}
+          {t('admTest.airdrop')}
         </label>
         <label className="block text-sm space-y-1">
-          Horizon
+          Solana RPC (REST)
           <input className="w-full px-3 py-2 rounded-xl border border-black/10 font-mono text-xs" value={horizonUrl} onChange={(e) => setHorizonUrl(e.target.value)} />
         </label>
         <label className="block text-sm space-y-1">
-          Soroban RPC
+          Solana RPC (programas)
           <input className="w-full px-3 py-2 rounded-xl border border-black/10 font-mono text-xs" value={rpcUrl} onChange={(e) => setRpcUrl(e.target.value)} />
         </label>
         <button type="button" onClick={save} className="px-5 py-3 rounded-2xl bg-black text-white font-display font-bold">

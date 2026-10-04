@@ -12,7 +12,7 @@ export interface UsdcFundResult {
 /**
  * Garantiza que la wallet pueda recibir USDC de testnet y la carga con el
  * grant de la plataforma. Cuentas custodiales: todo server-side. Self-custody:
- * el backend devuelve el changeTrust XDR y se firma con Freighter acá mismo —
+ * el backend devuelve la transacción de creación de ATA y se firma con la wallet acá mismo —
  * es la única firma que la cadena exige al dueño de la wallet.
  */
 export async function ensureUsdcReady(token: string): Promise<UsdcFundResult> {

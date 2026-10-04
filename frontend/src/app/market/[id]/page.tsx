@@ -54,7 +54,7 @@ export default function PoolDetailPage() {
     const xlm = listing?.dossier?.paymentKind === 'XLM';
     const onChainLive = Boolean(listing?.onChain?.live);
     if (!auth) {
-      setNotice(t(xlm ? 'market.loginToContributeXlm' : 'market.loginToContribute'));
+      setNotice(t(xlm ? 'market.loginToContributeSol' : 'market.loginToContribute'));
       return;
     }
     setBusy(true);
@@ -62,8 +62,8 @@ export default function PoolDetailPage() {
       let data: any;
       if (onChainLive && isSelfCustody(user)) {
         // Wallet propia: el contrato pide la firma del inversor, así que el
-        // backend arma la invocación y Freighter la firma.
-        setNotice(t('market.freighterSign'));
+        // backend arma la transacción y la wallet la firma.
+        setNotice(t('market.walletSign'));
         data = await signAndRelay({
           prepare: `/api/listings/${poolId}/contribute/prepare`,
           submit: `/api/listings/${poolId}/contribute/submit`,
@@ -106,7 +106,7 @@ export default function PoolDetailPage() {
         setLastHash({ kind: 'trustline', hash, explorer: onChain?.trustlineExplorer });
         setNotice(t('market.subscribedHash', { n: raised, hash }));
       } else if (onChainLive) {
-        setNotice(t('market.subscribedRaisedXlm', { n: raised, u: unit }));
+        setNotice(t('market.subscribedRaisedSol', { n: raised, u: unit }));
       } else {
         setNotice(t('market.subscribedRaised', { n: raised }));
       }
@@ -178,7 +178,7 @@ export default function PoolDetailPage() {
       !holding?.refundedAt;
     const canRefund =
       Boolean(live.live) && failed && Boolean(holding) && !holding?.refundedAt;
-    // Units already paid on-ledger to the user's wallet (what Freighter shows)
+    // Units already paid on-chain to the user's wallet (what the wallet shows)
     // vs. units that exist only in the platform ledger and can still be sent.
     const onChainUnits = Number(holding?.tokensOnChain || 0);
     const pendingOnChain = Math.max(0, Number(holding?.tokens || 0) - onChainUnits);
@@ -234,7 +234,7 @@ export default function PoolDetailPage() {
                     <dd className="font-mono text-xs break-all">
                       {String(listing.licitacionContract || '').startsWith('C') ? (
                         <a
-                          href={`https://stellar.expert/explorer/testnet/contract/${listing.licitacionContract}`}
+                          href={`https://explorer.solana.com/address/${listing.licitacionContract}?cluster=devnet`}
                           target="_blank"
                           rel="noreferrer"
                           className="underline"
@@ -285,7 +285,7 @@ export default function PoolDetailPage() {
               {listing.status === 'LISTED' && (
                 <p className="text-sm text-neutral-600">
                   {live.live
-                    ? t('market.closesAtXlm', { n: formatInt(d.offeringHardCapUsdc), u: unit })
+                    ? t('market.closesAtSol', { n: formatInt(d.offeringHardCapUsdc), u: unit })
                     : t('market.closesAt', { n: formatInt(d.offeringSoftCapUsdc) })}
                 </p>
               )}
@@ -305,7 +305,7 @@ export default function PoolDetailPage() {
                   )}
                   {typeof live.fiduciaryUsdc !== 'number' && typeof live.fiduciaryXlm === 'number' && (
                     <p className="text-[11px] text-neutral-500">
-                      {t('market.payoutBalance', { n: live.fiduciaryXlm.toFixed(4), u: 'XLM' })}
+                      {t('market.payoutBalance', { n: live.fiduciaryXlm.toFixed(4), u: 'SOL' })}
                     </p>
                   )}
                   {live.fiduciaryMismatch && (
@@ -333,7 +333,7 @@ export default function PoolDetailPage() {
                         .then((data: any) => {
                           const dist = data?.distribution;
                           if (dist?.hash) {
-                            setLastHash({ kind: 'distribute', hash: dist.hash, explorer: `https://stellar.expert/explorer/testnet/tx/${dist.hash}` });
+                            setLastHash({ kind: 'distribute', hash: dist.hash, explorer: `https://explorer.solana.com/tx/${dist.hash}?cluster=devnet` });
                             setNotice(t('market.claimedOnChain', { hash: dist.hash }));
                           } else if (dist?.error) {
                             setNotice(`${t('market.claimedNotice')} ${dist.error}`);
@@ -363,8 +363,8 @@ export default function PoolDetailPage() {
                   )}
                   <p className="text-[11px] text-neutral-500">
                     {user.custodyMode === 'SELF'
-                      ? t('market.freighterHintSelf')
-                      : t('market.freighterHintCustodial')}
+                      ? t('market.walletHintSelf')
+                      : t('market.walletHintCustodial')}
                   </p>
                   {pendingOnChain > 0 && (
                     <button
@@ -376,7 +376,7 @@ export default function PoolDetailPage() {
                         distributeTokens(listing.id)
                           .then((data: any) => {
                             if (data?.hash) {
-                              setLastHash({ kind: 'distribute', hash: data.hash, explorer: `https://stellar.expert/explorer/testnet/tx/${data.hash}` });
+                              setLastHash({ kind: 'distribute', hash: data.hash, explorer: `https://explorer.solana.com/tx/${data.hash}?cluster=devnet` });
                               setNotice(t('market.receivedOnChain', { n: Number(data.amount).toFixed(4), code: d.tokenTicker }));
                             } else {
                               setNotice(t('market.claimedNotice'));
@@ -417,7 +417,7 @@ export default function PoolDetailPage() {
                 disabled={busy || user?.kycStatus !== 'APPROVED' || listing.status !== 'LISTED'}
                 className="w-full py-3 rounded-2xl bg-black text-white font-display font-bold disabled:opacity-40"
               >
-                {busy ? '…' : xlm ? t('market.contributeXlm') : t('market.contribute')}
+                {busy ? '…' : xlm ? t('market.contributeSol') : t('market.contribute')}
               </button>
               {live.live && listing.status === 'LISTED' && (
                 <button
@@ -475,7 +475,7 @@ export default function PoolDetailPage() {
                         ? t('market.distributeTx')
                         : lastHash.kind === 'contribute'
                           ? t('market.contributeTx')
-                          : t('market.trustline')}
+                          : t('market.ata')}
                   {': '}
                   {lastHash.hash}
                 </a>
@@ -487,7 +487,7 @@ export default function PoolDetailPage() {
                   rel="noreferrer"
                   className="block text-xs font-mono underline break-all"
                 >
-                  {t('market.trustline')}
+                  {t('market.ata')}
                 </a>
               )}
             </div>

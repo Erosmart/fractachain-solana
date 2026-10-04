@@ -17,7 +17,7 @@ export default function Footer() {
           <div className="space-y-4 max-w-sm shrink-0">
             <BrandMark />
             <p className="text-neutral-600 text-sm leading-relaxed">
-              {t('footer.blurb')} <strong className="text-black">Stellar</strong>.
+              {t('footer.blurb')} <strong className="text-black">Solana</strong>.
             </p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-8">

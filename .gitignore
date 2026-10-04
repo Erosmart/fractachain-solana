@@ -28,3 +28,9 @@ fractalchain.md
 backend/data/users.json
 backend/data/selfies/
 agents_secrets.json
+
+# Docs e instrucciones: no se publican (quedan solo locales)
+*.md
+!/README.md
+.agents/
+links.md

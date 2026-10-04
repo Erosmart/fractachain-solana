@@ -147,7 +147,7 @@ export default function DashboardPage() {
 
   // Wallets created before the faucet exist on-chain but have no USDC — the
   // button tops them up to the grant. Custodial is silent; self-custody signs
-  // one changeTrust in Freighter (the only signature the chain accepts).
+  // one signature in the wallet (the only signature the chain accepts).
   const fundUsdc = async () => {
     if (!token) return;
     setFundingUsdc(true);
@@ -266,7 +266,7 @@ export default function DashboardPage() {
             <p className="font-display font-extrabold">{t('dash.proceeds')}</p>
             <p className="text-sm text-neutral-600 mt-0.5">{t('dash.proceedsLead')}</p>
             <p className="text-xs text-neutral-500 mt-1">
-              {t('dash.xlmOnChain', { n: money(book?.xlmOnChain ?? 0, 4) })}
+              {t('dash.solOnChain', { n: money(book?.xlmOnChain ?? 0, 4) })}
             </p>
           </div>
           <div className="space-y-2">
@@ -290,7 +290,7 @@ export default function DashboardPage() {
                   )}
                 </div>
                 <div className="font-lcd font-bold">
-                  {money(p.amount, p.paymentKind === 'XLM' ? 4 : 2)} {p.paymentKind === 'XLM' ? 'XLM' : 'USDC'}
+                  {money(p.amount, p.paymentKind === 'XLM' ? 4 : 2)} {p.paymentKind === 'XLM' ? 'SOL' : 'USDC'}
                 </div>
               </div>
             ))}
@@ -355,7 +355,7 @@ export default function DashboardPage() {
                     )}
                     {h.finalizeHash && (
                       <a
-                        href={`https://stellar.expert/explorer/testnet/tx/${h.finalizeHash}`}
+                        href={`https://explorer.solana.com/tx/${h.finalizeHash}?cluster=devnet`}
                         target="_blank"
                         rel="noreferrer"
                         className="block text-[11px] font-mono underline break-all mt-1"
@@ -365,7 +365,7 @@ export default function DashboardPage() {
                     )}
                     {h.refundHash && (
                       <a
-                        href={`https://stellar.expert/explorer/testnet/tx/${h.refundHash}`}
+                        href={`https://explorer.solana.com/tx/${h.refundHash}?cluster=devnet`}
                         target="_blank"
                         rel="noreferrer"
                         className="block text-[11px] font-mono underline break-all mt-1"

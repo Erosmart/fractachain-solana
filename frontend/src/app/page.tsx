@@ -32,7 +32,7 @@ export default function HomePage() {
 
   const soonIcons: LucideIcon[] = [TrendingUp, Sprout, FileText, Landmark];
   const badgeIcons: LucideIcon[] = [ShieldCheck, Lock, Zap, CheckCircle2];
-  const stellarIcons: LucideIcon[] = [Zap, DollarSign, Globe2, ShieldCheck, KeyRound];
+  const solanaIcons: LucideIcon[] = [Zap, DollarSign, Globe2, ShieldCheck, KeyRound];
 
   return (
     <div className="space-y-10 sm:space-y-16 lg:space-y-24">
@@ -94,19 +94,19 @@ export default function HomePage() {
           <div className="space-y-1">
             <div className="inline-flex items-center gap-2 text-xs font-display font-bold text-neutral-500 uppercase tracking-wider">
               <Globe2 className="w-4 h-4" />
-              {messages.partners.stellar.kicker}
+              {messages.partners.solana.kicker}
             </div>
             <h2 className="font-section text-2xl sm:text-3xl font-extrabold text-black">
-              {messages.partners.stellar.title}
+              {messages.partners.solana.title}
             </h2>
           </div>
           <p className="text-sm text-neutral-600 max-w-md">
-            {messages.partners.stellar.body}
+            {messages.partners.solana.body}
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {messages.partners.stellar.items.map(([title, desc], i) => {
-            const Icon = stellarIcons[i];
+          {messages.partners.solana.items.map(([title, desc], i) => {
+            const Icon = solanaIcons[i];
             return (
               <div key={title} className="p-5 rounded-2xl crystal-card space-y-3">
                 <Icon className="w-5 h-5 text-[#4ea743]" />

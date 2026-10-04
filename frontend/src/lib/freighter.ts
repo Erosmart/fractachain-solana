@@ -18,15 +18,15 @@ export type FreighterLoginPayload = { publicKey: string; message: string; signat
 export async function freighterAddress(): Promise<string> {
   const conn = await isConnected().catch(() => ({ isConnected: false }));
   if (!conn.isConnected) {
-    throw new Error(tClient('err.freighterMissing'));
+    throw new Error(tClient('err.walletMissing'));
   }
   const allowed = await isAllowed().catch(() => ({ isAllowed: false }));
   if (!allowed.isAllowed) {
     const acc = await requestAccess();
-    if (acc.error) throw new Error(acc.error.message || tClient('err.freighterRejected'));
+    if (acc.error) throw new Error(acc.error.message || tClient('err.walletRejected'));
   }
   const { address, error: addrErr } = await getAddress();
-  if (addrErr || !address) throw new Error(addrErr?.message || tClient('err.freighterNoAddress'));
+  if (addrErr || !address) throw new Error(addrErr?.message || tClient('err.walletNoAddress'));
   return address;
 }
 
@@ -34,9 +34,9 @@ async function freighterSignPayload(prefix: string): Promise<FreighterLoginPaylo
   const address = await freighterAddress();
   const message = `${prefix}${Date.now()}`;
   const res = await signMessage(message, { address });
-  if (res.error) throw new Error(res.error.message || tClient('err.freighterNoSign'));
+  if (res.error) throw new Error(res.error.message || tClient('err.walletNoSign'));
   const sig = res.signedMessage;
-  if (!sig) throw new Error(tClient('err.freighterNoSign'));
+  if (!sig) throw new Error(tClient('err.walletNoSign'));
 
   const signature = typeof sig === 'string' ? sig : toBase64(sig);
   return { publicKey: address, message, signature };
@@ -54,22 +54,22 @@ export function freighterLinkPayload(): Promise<FreighterLoginPayload> {
 /**
  * Signs a transaction the backend already built and simulated.
  *
- * Works for both classic operations (trustline, SDEX offers) and Soroban
+ * Works for both token-account creation and program
  * invocations: the wallet is the transaction source, so its signature is what
- * satisfies `require_auth` inside the contract.
+ * satisfies the signer check inside the program.
  */
 export async function freighterSignXdr(xdr: string): Promise<string> {
   const address = await freighterAddress();
   const net = await getNetwork().catch(() => ({ networkPassphrase: '' }));
   if (net.networkPassphrase && net.networkPassphrase !== TESTNET_PASSPHRASE) {
-    throw new Error(tClient('err.freighterWrongNet'));
+    throw new Error(tClient('err.walletWrongNet'));
   }
   const res = await signTransaction(xdr, {
     address,
     networkPassphrase: TESTNET_PASSPHRASE,
   });
-  if (res.error) throw new Error(res.error.message || tClient('err.freighterSignRejected'));
-  if (!res.signedTxXdr) throw new Error(tClient('err.freighterNoSignedTx'));
+  if (res.error) throw new Error(res.error.message || tClient('err.walletSignRejected'));
+  if (!res.signedTxXdr) throw new Error(tClient('err.walletNoSignedTx'));
   return res.signedTxXdr;
 }
 

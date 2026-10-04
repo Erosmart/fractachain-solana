@@ -113,8 +113,8 @@ export default function LoginInner() {
           className="w-full py-3 rounded-2xl border border-black/15 bg-white font-display font-bold flex items-center justify-center gap-2 hover:bg-black/[0.03] transition-colors"
         >
           <BrandLogo
-            slug="freighter"
-            alt="Freighter"
+            slug="phantom"
+            alt="Phantom"
             className="h-4 w-auto object-contain"
             fallback={<Wallet size={18} />}
           />

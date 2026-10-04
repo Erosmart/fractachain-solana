@@ -52,7 +52,7 @@ export default function MarketPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {pools.map((pool) => {
           const progress = Math.min(100, Math.round((pool.raisedAmount / pool.hardCap) * 100));
-          const unit = (pool as any).paymentKind === 'XLM' ? 'XLM' : 'USDC';
+          const unit = (pool as any).paymentKind === 'XLM' ? 'SOL' : 'USDC';
           return (
             <article key={pool.id} className="p-6 rounded-3xl crystal-card space-y-4 flex flex-col">
               <div className="flex justify-between gap-2">

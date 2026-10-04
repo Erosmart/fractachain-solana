@@ -62,7 +62,7 @@ export default function WalletPage() {
       if (!res.ok || json.success === false) throw new Error(json.message || t('wallet.usdcFundFail'));
       let data = json.data;
       if (data?.status === 'NEED_TRUSTLINE' && data.xdr) {
-        setFundNotice(t('wallet.usdcSignTrustline'));
+        setFundNotice(t('wallet.usdcSignAta'));
         const signed = await freighterSignXdr(data.xdr);
         const res2 = await fetch(`${API_BASE_URL}/api/wallet/usdc/submit`, {
           method: 'POST',
@@ -139,7 +139,7 @@ export default function WalletPage() {
             </div>
             {balance != null && (
               <p className="text-sm">
-                {t('wallet.balance')}: <strong>{Number(balance).toFixed(2)} XLM</strong>
+                {t('wallet.balance')}: <strong>{Number(balance).toFixed(2)} SOL</strong>
               </p>
             )}
             {usdcBalance != null && (
@@ -164,12 +164,12 @@ export default function WalletPage() {
             )}
             {fundNotice && <p className="text-sm text-neutral-700">{fundNotice}</p>}
             <a
-              href={`https://stellar.expert/explorer/testnet/account/${publicKey}`}
+              href={`https://explorer.solana.com/address/${publicKey}?cluster=devnet`}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 text-sm font-bold text-[#2f6f28]"
             >
-              Stellar Expert <ExternalLink className="w-4 h-4" />
+              Solana Explorer <ExternalLink className="w-4 h-4" />
             </a>
           </>
         ) : (

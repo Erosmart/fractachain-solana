@@ -12,10 +12,10 @@ interface Partner {
 const PARTNERS: Partner[] = [
   { name: 'BYMA', accent: 'from-blue-500/20 to-cyan-500/20 border-blue-500/40 text-blue-300' },
   { name: 'Caja de Valores', accent: 'from-emerald-500/20 to-teal-500/20 border-emerald-500/40 text-emerald-300' },
-  { name: 'Stellar Foundation', accent: 'from-purple-500/20 to-pink-500/20 border-purple-500/40 text-purple-300' },
-  { name: 'Alfred Pay', accent: 'from-amber-500/20 to-orange-500/20 border-amber-500/40 text-amber-300' },
+  { name: 'Solana Foundation', accent: 'from-purple-500/20 to-pink-500/20 border-purple-500/40 text-purple-300' },
+  { name: 'Manteca', accent: 'from-amber-500/20 to-orange-500/20 border-amber-500/40 text-amber-300' },
   { name: 'Matba Rofex', accent: 'from-yellow-500/20 to-lime-500/20 border-yellow-500/40 text-yellow-300' },
-  { name: 'Anclap', accent: 'from-cyan-500/20 to-blue-500/20 border-cyan-500/40 text-cyan-300' },
+  { name: 'Koywe', accent: 'from-cyan-500/20 to-blue-500/20 border-cyan-500/40 text-cyan-300' },
   { name: 'Circle CCTP', accent: 'from-emerald-500/20 to-cyan-500/20 border-emerald-500/40 text-emerald-300' },
 ];
 
@@ -26,10 +26,10 @@ export default function PartnersShowcase() {
   const fundingLogos = [
     <BrandLogo
       key="alfred"
-      slug="alfred-pay"
-      alt="Alfred Pay"
+      slug="manteca"
+      alt="Manteca"
       className="h-7 w-auto max-h-7 max-w-[6rem] object-contain object-left"
-      fallback={<span className="text-xs font-display font-bold text-black">Alfred Pay</span>}
+      fallback={<span className="text-xs font-display font-bold text-black">Manteca</span>}
     />,
     <BrandLogo
       key="moneygram"
@@ -120,21 +120,21 @@ export default function PartnersShowcase() {
           );
         })}
 
-        {/* Highlight Card: SCF Argentina Builder Challenge */}
+        {/* Highlight Card: Colosseum / Superteam Argentina */}
         <div className="p-5 rounded-2xl crystal-card flex flex-col justify-between space-y-3">
           <div className="space-y-2">
             <BrandLogo
-              slug="scf"
-              alt="Stellar Community Fund"
+              slug="superteam"
+              alt="Superteam Argentina"
               className="h-8 w-auto max-w-[7rem] object-contain"
               fallback={
                 <span className="px-2.5 py-1 rounded-lg text-[10px] font-lcd font-bold uppercase border border-black/10 text-black inline-block">
-                  SCF Integration Track
+                  Colosseum H2 2026
                 </span>
               }
             />
             <div className="text-sm font-display font-bold text-black">
-              Stellar Community Fund
+              Superteam · Colosseum
             </div>
             <p className="text-xs text-neutral-600 leading-relaxed">
               {messages.partners.scf}

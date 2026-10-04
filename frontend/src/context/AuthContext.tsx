@@ -208,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok || !data.success || !data.user) throw new Error(data.message || tClient('err.walletLogin'));
       const u = normalize(data.user);
       applySession(data.token, data.user);
-      // Una firma Freighter más dentro del login: habilita la trustline USDC y
+      // Una firma más dentro del login: crea la ATA de USDC y
       // dispara el grant. Sin ella la wallet no puede recibir USDC.
       await ensureUsdcReady(data.token).catch(() => undefined);
       return u;
@@ -235,7 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const u = normalize(data.user);
       applySession(data.token, data.user);
       // Wallets ya configuradas: custodiales se fondean server-side sin popup;
-      // self-custody firma la trustline una sola vez si le falta.
+      // self-custody firma la creación de la ATA una sola vez si le falta.
       if (u.publicKey && u.custodyMode) await ensureUsdcReady(data.token).catch(() => undefined);
       return u;
     } catch (err: any) {
@@ -276,7 +276,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (data.secretOnce) setRevealedSecret(data.secretOnce);
     applySession(token, data.user);
     // Mismo post-paso que en login/link: custodial se resuelve en el backend,
-    // self-custody firma el changeTrust en Freighter una sola vez.
+    // self-custody firma la creación de la ATA en la wallet una sola vez.
     await ensureUsdcReady(token).catch(() => undefined);
   }, [token, applySession]);
 
@@ -295,7 +295,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const approveToken = useCallback(async (listingId: string) => {
     if (!token) throw new Error(tClient('err.signIn'));
     if (user?.custodyMode === 'SELF') {
-      // La trustline vive en la wallet del inversor: solo su firma la puede
+      // La ATA vive en la wallet del inversor: solo su firma la puede
       // crear. Después registramos el opt-in y el emisor la autoriza.
       await signAndRelay({
         prepare: `/api/sdex/${listingId}/trustline/prepare`,
@@ -303,7 +303,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         token,
       }).catch((err: any) => {
         // Sin cuenta emisora todavía no hay asset que aprobar: el opt-in queda
-        // registrado en la plataforma y la trustline se firma cuando exista.
+        // registrado en la plataforma y la ATA se crea cuando exista.
         if (/no cotiza en el DEX/i.test(err?.message || '')) return null;
         throw err;
       });

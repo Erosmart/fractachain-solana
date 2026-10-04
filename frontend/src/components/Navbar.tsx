@@ -36,7 +36,7 @@ export default function Navbar() {
   const adminLinks = [
     { href: '/admin/issuance', label: t('nav.issuance'), icon: Coins },
     { href: '/admin/kyc', label: t('nav.kyc'), icon: UserCheck },
-    { href: '/admin/testnet', label: t('nav.testnet'), icon: Activity },
+    { href: '/admin/network', label: t('nav.devnet'), icon: Activity },
   ];
 
   const allLinks = user?.isAdmin ? [...primaryLinks, ...adminLinks] : primaryLinks;
@@ -76,7 +76,7 @@ export default function Navbar() {
                 <Wallet className="w-3.5 h-3.5 shrink-0" />
                 <span className="whitespace-nowrap">
                   {user?.publicKey
-                    ? `${formatAmount(Number(user.xlmBalance || 0), 2)} XLM`
+                    ? `${formatAmount(Number(user.xlmBalance || 0), 2)} SOL`
                     : t('nav.portfolio')}
                 </span>
               </Link>
@@ -152,7 +152,7 @@ export default function Navbar() {
             >
               <Wallet className="w-4 h-4 shrink-0" />
               {user?.publicKey
-                ? `${formatAmount(Number(user.xlmBalance || 0), 2)} XLM`
+                ? `${formatAmount(Number(user.xlmBalance || 0), 2)} SOL`
                 : t('nav.portfolio')}
             </Link>
             {user ? (

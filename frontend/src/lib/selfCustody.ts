@@ -8,7 +8,7 @@ import { tClient } from './i18n';
  * Self-custody transaction flow.
  *
  * The backend builds and simulates the transaction but never holds the key:
- * `/prepare` returns an unsigned XDR, Freighter signs it, and the submit
+ * `/prepare` returns an unsigned transaction, the wallet signs it, and the submit
  * endpoint relays it to the network. Custodial accounts skip all of this and
  * hit the one-shot endpoints where the platform signs on their behalf.
  */
@@ -35,7 +35,7 @@ export async function postJson<T>(
   return json.data as T;
 }
 
-/** prepare → sign in Freighter → relay. Returns whatever the relay answered. */
+/** prepare → sign in wallet → relay. Returns whatever the relay answered. */
 export async function signAndRelay<T>(params: {
   prepare: string;
   submit: string;

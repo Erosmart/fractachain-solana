@@ -90,14 +90,14 @@ export default function WalletOnboardingPage() {
           className="p-6 rounded-3xl crystal-card text-left space-y-3 hover:border-black/20"
         >
           <BrandLogo
-            slug="freighter"
-            alt="Freighter"
+            slug="phantom"
+            alt="Phantom"
             className="h-7 w-auto object-contain object-left"
             fallback={<Wallet className="w-7 h-7" />}
           />
-          <h2 className="font-section text-xl font-extrabold">{t('onboarding.freighterTitle')}</h2>
+          <h2 className="font-section text-xl font-extrabold">{t('onboarding.phantomTitle')}</h2>
           <p className="text-neutral-600 text-sm">
-            {t('onboarding.freighterBody')}
+            {t('onboarding.phantomBody')}
           </p>
         </button>
       </div>

@@ -49,7 +49,7 @@ const INITIAL_HOLDERS: TokenHolder[] = [
   },
   {
     address: 'GDK81...5520',
-    name: 'Minoristas en Stellar DEX (142 cuentas)',
+    name: 'Minoristas en Manifest (142 cuentas)',
     nameKey: 'admOpa.holderRetail',
     tokensHeld: 83000,
     percentage: 16.6,
