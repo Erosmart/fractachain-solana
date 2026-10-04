@@ -8,27 +8,75 @@ import {
   simulateMarket, ensureAta, fmt, fmtInt, shortPk, explorerTx, Candle,
 } from './lib';
 
-function CandleChart({ candles }: { candles: Candle[] }) {
+function CandleChart({ candles, locale }: { candles: Candle[]; locale: string }) {
   if (candles.length < 2) return null;
-  const W = 640, H = 150, PAD = 10;
+  const W = 720, H = 220;
+  const PADL = 8, PADR = 58, PADT = 12, PADB = 20, VOLH = 34;
+  const plotW = W - PADL - PADR;
+  const priceH = H - PADT - PADB - VOLH - 6;
   const lo = Math.min(...candles.map((c) => c.l));
   const hi = Math.max(...candles.map((c) => c.h));
   const range = Math.max(hi - lo, 0.01);
-  const bw = (W - PAD * 2) / candles.length;
-  const y = (p: number) => PAD + (1 - (p - lo) / range) * (H - PAD * 2);
+  const maxV = Math.max(...candles.map((c) => c.v || 0), 1);
+  const bw = plotW / candles.length;
+  const y = (p: number) => PADT + (1 - (p - lo) / range) * priceH;
+  const last = candles[candles.length - 1];
+  const gridN = 4;
+  const timeFmt = (t: number) =>
+    new Date(t).toLocaleTimeString(locale === 'en' ? 'en-US' : 'es-AR', { hour: '2-digit', minute: '2-digit' });
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
+      {/* grid horizontal + labels de precio */}
+      {Array.from({ length: gridN + 1 }, (_, i) => {
+        const p = lo + (range * i) / gridN;
+        const yy = y(p);
+        return (
+          <g key={i}>
+            <line x1={PADL} x2={W - PADR} y1={yy} y2={yy} stroke="#000" strokeOpacity={0.07} strokeDasharray="3 4" />
+            <text x={W - PADR + 6} y={yy + 3} fontSize={9} fill="#000" fillOpacity={0.45} fontFamily="monospace">
+              {fmt(p)}
+            </text>
+          </g>
+        );
+      })}
+      {/* velas */}
       {candles.map((c, i) => {
-        const x = PAD + i * bw + bw / 2;
+        const x = PADL + i * bw + bw / 2;
         const up = c.c >= c.o;
         const col = up ? '#059669' : '#dc2626';
         const top = Math.min(y(c.o), y(c.c));
         const body = Math.max(1.5, Math.abs(y(c.o) - y(c.c)));
+        const vh = ((c.v || 0) / maxV) * VOLH;
         return (
           <g key={i}>
-            <line x1={x} x2={x} y1={y(c.h)} y2={y(c.l)} stroke={col} strokeWidth={1} />
+            <rect x={x - bw * 0.32} y={H - PADB - vh} width={Math.max(1.5, bw * 0.64)} height={vh} fill={col} opacity={0.25} />
+            <line x1={x} x2={x} y1={y(c.h)} y2={y(c.l)} stroke={col} strokeWidth={1.2} />
             <rect x={x - bw * 0.32} y={top} width={Math.max(1.5, bw * 0.64)} height={body} fill={col} rx={0.5} />
           </g>
+        );
+      })}
+      {/* línea de último precio */}
+      <line x1={PADL} x2={W - PADR} y1={y(last.c)} y2={y(last.c)} stroke="#111" strokeOpacity={0.5} strokeDasharray="2 3" />
+      <rect x={W - PADR + 2} y={y(last.c) - 8} width={PADR - 6} height={15} rx={3} fill="#111" />
+      <text x={W - PADR + 6} y={y(last.c) + 3} fontSize={9} fill="#fff" fontFamily="monospace">
+        {fmt(last.c)}
+      </text>
+      {/* eje de tiempo */}
+      {[0, 0.33, 0.66, 1].map((f) => {
+        const i = Math.min(candles.length - 1, Math.round(f * (candles.length - 1)));
+        return (
+          <text
+            key={f}
+            x={PADL + i * bw + bw / 2}
+            y={H - 5}
+            fontSize={8.5}
+            fill="#000"
+            fillOpacity={0.4}
+            fontFamily="monospace"
+            textAnchor="middle"
+          >
+            {timeFmt(candles[i].t)}
+          </text>
         );
       })}
     </svg>
@@ -147,7 +195,7 @@ export default function OrderbookPanel() {
           </span>
           <span className="font-lcd text-xs text-black/40">{candles.length} candles</span>
         </div>
-        <CandleChart candles={candles} />
+        <CandleChart candles={candles} locale={locale} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">

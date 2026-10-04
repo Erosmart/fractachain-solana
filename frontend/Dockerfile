@@ -1,5 +1,5 @@
 # Build from the repo root:
-#   docker build -f frontend/Dockerfile --build-arg NEXT_PUBLIC_API_URL=http://localhost:4000 .
+#   docker build -f frontend/Dockerfile --build-arg NEXT_PUBLIC_API_URL=http://localhost:8080 .
 # Railway: empty Root Directory, Dockerfile path = frontend/Dockerfile
 # NEXT_PUBLIC_* is baked in at build time — set the public backend URL as a build arg.
 FROM node:20-alpine AS builder
@@ -8,7 +8,7 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
 RUN mkdir -p public
-ARG NEXT_PUBLIC_API_URL=http://localhost:4000
+ARG NEXT_PUBLIC_API_URL=http://localhost:8080
 ARG NEXT_PUBLIC_SOLANA_CLUSTER=devnet
 ARG NEXT_PUBLIC_SOLANA_RPC_URL=https://api.devnet.solana.com
 ARG NEXT_PUBLIC_FIREBASE_API_KEY

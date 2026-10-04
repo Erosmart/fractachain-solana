@@ -2,7 +2,7 @@
 /**
  * Agentes demo: fondean una licitación (Las Lilas II) y operan el orderbook.
  *
- *   HACKATHON_DEMO=true npm run dev   (backend en :4000)
+ *   HACKATHON_DEMO=true npm run dev   (backend en :8080)
  *   node scripts/agents_lilas.mjs
  *
  * Escribe agents_secrets.json en la raíz del repo con las claves privadas
@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const API = process.env.API_URL || 'http://localhost:4000';
+const API = process.env.API_URL || 'http://localhost:8080';
 const N_AGENTS = Number(process.env.AGENTS || 6);
 const TRADE_ROUNDS = Number(process.env.ROUNDS || 12);
 const OUT = path.join(process.cwd(), '..', 'agents_secrets.json');
