@@ -18,8 +18,15 @@ export function loadDeployment(): SolanaDeployment | null {
   return readDeployment<SolanaDeployment>();
 }
 
-/** True only after scripts/devnet/03-deploy.sh stamps `deployedAt` — the placeholder file stays in sandbox mode. */
+/**
+ * True after scripts/devnet/03-deploy.sh stamps `deployedAt`, or when ops sets
+ * FRACTACHAIN_PROGRAM_DEPLOYED=true (Railway env switch — no rebuild needed).
+ * The placeholder file stays in sandbox mode.
+ */
 export function isProgramDeployed(): boolean {
+  if (process.env.FRACTACHAIN_PROGRAM_DEPLOYED === 'true') {
+    return true;
+  }
   const dep = loadDeployment();
   return Boolean(dep?.programId && dep.deployedAt);
 }

@@ -4,6 +4,10 @@ import { FALLBACK_PROGRAM_ID } from './connection';
 import { readDeployment } from './connection';
 
 export function programId(): PublicKey {
+  // Env wins over the deployments file so ops (Railway) can point at a real
+  // program without rebuilding the image.
+  const env = (process.env.FRACTACHAIN_PROGRAM_ID || '').trim();
+  if (env) return new PublicKey(env);
   const dep = readDeployment<{ programId?: string }>();
   return new PublicKey(dep?.programId || FALLBACK_PROGRAM_ID);
 }
