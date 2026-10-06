@@ -16,11 +16,9 @@ services:
     environment:
       PORT: "8080"
       NODE_ENV: production
-      STELLAR_NETWORK: ${STELLAR_NETWORK:-testnet}
-      STELLAR_HORIZON_URL: ${STELLAR_HORIZON_URL:-https://horizon-testnet.stellar.org}
-      STELLAR_RPC_URL: ${STELLAR_RPC_URL:-https://soroban-testnet.stellar.org}
-      STELLAR_FRIENDBOT_URL: ${STELLAR_FRIENDBOT_URL:-https://friendbot.stellar.org}
-      STELLAR_NETWORK_PASSPHRASE: ${STELLAR_NETWORK_PASSPHRASE:-Test SDF Network ; September 2015}
+      SOLANA_CLUSTER: ${SOLANA_CLUSTER:-devnet}
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.devnet.solana.com}
+      SOLANA_AUTO_FAUCET: ${SOLANA_AUTO_FAUCET:-false}
       HACKATHON_DEMO: ${HACKATHON_DEMO:-true}
     healthcheck:
       test:
