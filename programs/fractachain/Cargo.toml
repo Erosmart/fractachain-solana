@@ -1,0 +1,31 @@
+[package]
+name = "fractachain"
+version = "0.1.0"
+description = "Fractachain RWA licitacion + KYC + OPA on Solana"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "fractachain"
+
+[features]
+default = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+# Full SVM integration tests — requires a built .so (anchor build) and, on
+# Windows, OpenSSL. Enable with: cargo test --features litesvm-tests
+litesvm-tests = ["dep:litesvm", "dep:anchor-litesvm", "dep:solana-sdk"]
+
+[dependencies]
+anchor-lang = { version = "1.2.0", features = ["init-if-needed"] }
+anchor-spl = { version = "1.2.0", features = ["token_2022", "token_2022_extensions", "associated_token", "token", "metadata"] }
+spl-token-2022 = { version = "11", features = ["no-entrypoint"] }
+spl-token-metadata-interface = { version = "0.8", default-features = false }
+spl-type-length-value = { version = "0.7", default-features = false }
+sha2 = { version = "0.10", default-features = false }
+litesvm = { version = "0.17", optional = true }
+anchor-litesvm = { version = "0.4", optional = true }
+solana-sdk = { version = "2.2", optional = true }

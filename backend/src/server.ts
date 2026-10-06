@@ -59,12 +59,29 @@ import {
   listingCvDepositHash,
 } from './admin/listings';
 import { buildDemoDossier } from './admin/demo';
-import { ensurePlatformIssuer, platformIssuerPublicKey } from './stellar/keys';
+import { adminKeypair, adminPublicKey, hasAdminSecret } from './solana/keys';
 import {
-  canDeployStockVault,
-  deployStockVaultForListing,
-  mintBackedStockOnChain,
-} from './stellar/stockvault';
+  createOfferingOnChain,
+  mintSupplyOnChain,
+  openOfferingOnChain,
+  prepareContributeTx,
+  prepareRefundTx,
+  refundOnChainCustodial,
+  setFiduciaryOnChain,
+  submitContributeTx,
+  submitRefundTx,
+  withdrawProceedsOnChain,
+  contributeOnChain,
+} from './solana/offering';
+import { fetchOffering, fetchContribution } from './solana/offering_state';
+import { snapshotToApi } from './solana/onchain';
+import { usdcToUnits, unitsToUsdc, usdcMint, mintDemoUsdc, buildCreateUsdcAtaIx } from './solana/usdc';
+import { createMarket, authorizeVault } from './solana/manifest';
+import { initializePlatformOnChain } from './solana/platform';
+import { setHolderFrozenOnChain, verifyInvestorOnChain } from './solana/kyc';
+import { buildUnsignedTx, submitSignedTx } from './solana/tx';
+import { PublicKey } from '@solana/web3.js';
+import { setListingMarket } from './admin/listings';
 import { cancelOrder, getBook, listMarkets, placeOrder } from './market/orderbook';
 import {
   autoFinalizeIfDue,
@@ -84,36 +101,13 @@ import {
   prepareOrder,
   prepareTrustline,
   sdexAvailable,
-} from './market/sdex_book';
-import { buildTrustlineXdr, configureIssuerForRegulatedAsset, submitSignedXdr } from './stellar/sdex';
-import {
-  ensureWalletFunded,
-  fundTestnetUsdc,
-  payUsdcGrant,
-  usdcAsset,
-  USDC_NEEDS_TRUSTLINE,
-  walletFunds,
-} from './stellar/usdc';
-import { syncHolderAuthorization } from './stellar/compliance';
+} from './market/manifest_book';
+import { ensureWalletFunded } from './solana/wallet_funding';
+import { loadSolBalance, loadUsdcBalance } from './auth/solana_devnet';
+import { custodialSigningKeypair } from './auth/accounts';
 import { getTestnetConfig, setTestnetConfig } from './admin/testnet';
-import { isOnChainDeployed, loadTestnetDeployment } from './stellar/deployment';
-import { getOnChainStatus, listingChainMeta, receiptAfterContribute, explorerTx } from './stellar/onchain';
-import {
-  alreadyClosedOnChain,
-  closeStatusFromChain,
-  contributeOnChain,
-  prepareContributeXdr,
-  prepareRefundXdr,
-  refundOnChain,
-  snapshotLicitacion,
-  paymentUnit,
-  submitContributeXdr,
-  submitRefundXdr,
-  syncFiduciaryOnChain,
-  withdrawProceedsOnChain,
-  canDeployLicitacion,
-  deployLicitacionForListing,
-} from './stellar/licitacion';
+import { isProgramDeployed, loadDeployment } from './solana/deployment';
+import { getOnChainStatus, listingChainMeta, receiptAfterContribute, explorerTx } from './solana/onchain';
 import {
   authenticateWithGoogle,
   getUserByToken,
@@ -170,11 +164,11 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: 'online',
     service: 'Fractachain Admin & Mocks Backend',
-    protocol: 'Stellar & Soroban Protocol 28',
-    network: isOnChainDeployed()
-      ? 'Stellar Testnet (on-chain contracts loaded)'
-      : 'Stellar Testnet (sandbox until deployments/testnet.json exists)',
-    onChain: isOnChainDeployed(),
+    protocol: 'Solana (Anchor + Token-2022 + Manifest)',
+    network: isProgramDeployed()
+      ? `Solana ${process.env.SOLANA_CLUSTER || 'devnet'} (program loaded)`
+      : `Solana ${process.env.SOLANA_CLUSTER || 'devnet'} (sandbox — programa sin deployar)`,
+    onChain: isProgramDeployed(),
     timestamp: new Date().toISOString(),
   });
 });
@@ -263,7 +257,7 @@ app.post('/api/kyc/onboard', (req: Request, res: Response) => {
       countryName: 'Argentina',
       address: 'Onboarding in-app',
       investorType: 'National',
-      stellarAddress: user.publicKey,
+      walletAddress: user.publicKey,
       documentFrontUrl: user.selfieUrl || '',
       selfieUrl: `/api/kyc/selfie/${account.id}`,
     });
@@ -279,8 +273,8 @@ app.get('/api/kyc/selfie/:id', (req: Request, res: Response) => {
   res.sendFile(path.resolve(file));
 });
 
-// --- Wallet (Freighter) auth: firma del mensaje "fractachain-login:<ts>" ---
-app.post('/api/auth/freighter', async (req: Request, res: Response) => {
+// --- Wallet (Solana) auth: firma del mensaje "fractachain-login:<ts>" ---
+app.post('/api/auth/wallet-login', async (req: Request, res: Response) => {
   try {
     const result = authenticateWithWallet(req.body);
     if (result.success && result.user?.id) {
@@ -293,7 +287,7 @@ app.post('/api/auth/freighter', async (req: Request, res: Response) => {
   }
 });
 
-// Vincula Freighter a una cuenta ya autenticada: firma "fractachain-link:<ts>".
+// Vincula la wallet Solana a una cuenta ya autenticada: firma "fractachain-link:<ts>".
 app.post('/api/auth/wallet/link', async (req: Request, res: Response) => {
   const account = getAccountByToken(req.headers.authorization);
   if (!account) return res.status(401).json({ success: false, message: 'No autenticado' });
@@ -308,95 +302,57 @@ app.post('/api/auth/wallet/link', async (req: Request, res: Response) => {
 
 // --- Wallet balances + testnet USDC faucet ---
 
-/** Balances the wallet page shows: native XLM plus platform-issued testnet USDC. */
+/** Balances the wallet page shows: native SOL plus devnet USDC. */
 app.get('/api/wallet/state', async (req: Request, res: Response) => {
   try {
     const publicKey = String(req.query.account || '').trim();
     if (!publicKey) return res.status(400).json({ success: false, message: 'Falta account' });
-    // Self-heal for any registered wallet: friendbot + XLM refill + USDC.
-    // Custodial gets its trustline server-signed; self-custody still gets the
-    // XLM top-up and the USDC grant when its trustline already exists — the
-    // changeTrust signature itself is the holder's and cannot be faked.
     const owned = findAccountByPublicKey(publicKey);
     if (owned) {
       try {
-        await ensureWalletFunded(publicKey, {
-          walletSecret: owned.custodyMode === 'CUSTODIAL' ? custodialSigningKey(owned.id) : null,
-        });
+        await ensureWalletFunded(publicKey);
       } catch (err: any) {
         console.warn('[wallet-heal]', err?.message || err);
       }
     }
-    res.json({ success: true, data: await walletFunds(publicKey) });
+    res.json({
+      success: true,
+      data: {
+        publicKey,
+        sol: await loadSolBalance(publicKey),
+        usdc: await loadUsdcBalance(publicKey),
+        usdcMint: usdcMint()?.toBase58() || null,
+        cluster: process.env.SOLANA_CLUSTER || 'devnet',
+      },
+    });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
   }
 });
 
 /**
- * "Friendbot de USDC": the platform's own testnet issuer tops up the wallet.
+ * Devnet USDC faucet: the platform's mint authority tops up the wallet.
  *
- * Custodial accounts are funded inline (the backend signs their changeTrust).
- * Self-custody wallets get an unsigned changeTrust XDR for Freighter, then
- * call /submit so the issuer can pay the grant.
+ * Wallets without a USDC ATA get an unsigned create-ATA transaction for their
+ * wallet to sign, then retry for the grant (mintDemoUsdc covers both cases
+ * once the account exists).
  */
 app.post('/api/wallet/usdc/fund', async (req: Request, res: Response) => {
   const account = getAccountByToken(req.headers.authorization);
   if (!account) return res.status(401).json({ success: false, message: 'Iniciá sesión' });
   try {
-    if (!account.publicKey) throw new Error('La cuenta no tiene wallet de Stellar asociada');
-    if (account.custodyMode === 'CUSTODIAL') {
-      const result = await fundTestnetUsdc(account.publicKey, {
-        walletSecret: custodialSigningKey(account.id),
-      });
-      return res.json({ success: true, data: { status: 'FUNDED', ...result } });
-    }
-    // Self-custody: trustline needs their signature; the grant itself doesn't.
+    if (!account.publicKey) throw new Error('La cuenta no tiene wallet Solana asociada');
+    const wallet = new PublicKey(account.publicKey);
     try {
-      const result = await payUsdcGrant(account.publicKey);
-      return res.json({ success: true, data: { status: 'FUNDED', ...result } });
-    } catch (err: any) {
-      if (!String(err?.message || '').includes('trustline')) throw err;
-      const xdr = await buildTrustlineXdr(account.publicKey, usdcAsset());
+      const result = await mintDemoUsdc(wallet, 5_000);
+      return res.json({ success: true, data: { status: 'FUNDED', hash: result } });
+    } catch {
+      const transaction = await buildUnsignedTx(wallet, [buildCreateUsdcAtaIx(wallet)]);
       return res.json({
         success: true,
-        data: { status: 'NEED_TRUSTLINE', xdr, publicKey: account.publicKey },
+        data: { status: 'NEED_TRUSTLINE', transaction, publicKey: account.publicKey },
       });
     }
-  } catch (err: any) {
-    if (String(err?.message || '').includes(USDC_NEEDS_TRUSTLINE)) {
-      try {
-        const xdr = await buildTrustlineXdr(account.publicKey!, usdcAsset());
-        return res.json({
-          success: true,
-          data: { status: 'NEED_TRUSTLINE', xdr, publicKey: account.publicKey },
-        });
-      } catch (inner: any) {
-        return res.status(400).json({ success: false, message: inner?.message || String(inner) });
-      }
-    }
-    res.status(400).json({ success: false, message: err.message });
-  }
-});
-
-/** Relays the wallet-signed USDC trustline, then pays the testnet grant. */
-app.post('/api/wallet/usdc/submit', async (req: Request, res: Response) => {
-  const account = getAccountByToken(req.headers.authorization);
-  if (!account) return res.status(401).json({ success: false, message: 'Iniciá sesión' });
-  try {
-    if (!account.publicKey) throw new Error('La cuenta no tiene wallet de Stellar asociada');
-    const xdr = String(req.body?.xdr || '');
-    if (!xdr) throw new Error('Falta el XDR firmado');
-    const relayed = await submitSignedXdr(xdr);
-    const result = await payUsdcGrant(account.publicKey);
-    res.json({
-      success: true,
-      data: {
-        status: 'FUNDED',
-        trustlineHash: (relayed as any)?.hash || null,
-        ...result,
-      },
-    });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -448,7 +404,7 @@ app.get('/api/kyc', (req: Request, res: Response) => {
       docType: r.taxId ? 'CUIT' : 'DNI',
       docNumber: r.taxId || r.documentNumber,
       country: r.countryName,
-      walletAddress: r.stellarAddress,
+      walletAddress: r.walletAddress,
       userType: 'INVESTOR' as const,
       status: r.status === 'APROBADO' ? 'APPROVED' : r.status === 'RECHAZADO' ? 'REJECTED' : r.status === 'REVOCADO' ? 'REVOKED' : 'PENDING',
       isGafiHighRisk: false,
@@ -701,40 +657,41 @@ function onChainListingOr404(listingId: string) {
   const listing = getListing(listingId);
   if (!listing) throw new Error('Listing no encontrado');
   if (!isOnChainListing(listing)) {
-    throw new Error('Esta operación on-chain solo existe en licitaciones con contrato Soroban');
+    throw new Error('Esta operación on-chain solo existe en licitaciones con Offering PDA');
   }
   return listing;
 }
 
 /** `refund()` only exists once `finalize()` left the offering in Failed. */
 async function requireFailedOffering(listing: Listing, investor?: string) {
-  const live = await snapshotLicitacion(listing, investor);
-  if (live.state !== 2 && listing.status !== 'CLOSED_FAILED') {
+  const snap = await fetchOffering(listing.id);
+  const apiSnap = snap ? snapshotToApi(snap) : null;
+  if (snap?.state !== 'Failed' && listing.status !== 'CLOSED_FAILED') {
     throw new Error('refund() solo corre si finalize() dejó la emisión en Failed');
   }
-  return live;
+  return apiSnap || { state: 'Failed' };
 }
 
 async function listingPayload(listingId: string, investor?: string) {
   const listing = getListing(listingId);
   if (!listing) return null;
-  const live = await snapshotLicitacion(listing, investor);
+  const snap = isOnChainListing(listing) ? await fetchOffering(listing.id).catch(() => null) : null;
   let current = listing;
-  if (isOnChainListing(listing) && alreadyClosedOnChain(live) && listing.status === 'LISTED') {
-    const status = closeStatusFromChain(live, listing);
-    if (status) {
-      current = markListingClosed(listing.id, status, live.raised, {
-        proceedsPaidTo: live.fiduciary,
-      });
-      await settleHolders(current).catch(() => []);
-    }
+  if (snap && (snap.state === 'Successful' || snap.state === 'Failed') && listing.status === 'LISTED') {
+    current = markListingClosed(
+      listing.id,
+      snap.state === 'Successful' ? 'CLOSED_SUCCESS' : 'CLOSED_FAILED',
+      unitsToUsdc(snap.totalRaised),
+      { proceedsPaidTo: snap.fiduciary.toBase58() },
+    );
+    await settleHolders(current).catch(() => []);
   }
   return {
     listing: current,
     validation: validationPack(current),
     onChain: {
       ...listingChainMeta(current),
-      ...live,
+      ...(snap ? snapshotToApi(snap) : {}),
       hash: current.finalizeHash || null,
       explorer: current.finalizeHash ? explorerTx(current.finalizeHash) : listingChainMeta(current).explorer,
       finalizeExplorer: explorerTx(current.finalizeHash),
@@ -785,9 +742,7 @@ app.post('/api/listings', (req: Request, res: Response) => {
     // distributed to holders — default the field to whichever issuer key is
     // configured (or provision a friendbot-funded one on the spot).
     if (!String(body.issuerPublicKey || '').trim()) {
-      body.issuerPublicKey = (await ensurePlatformIssuer().catch(() => null))?.publicKey()
-        || platformIssuerPublicKey()
-        || '';
+      body.issuerPublicKey = adminPublicKey() || '';
     }
     return createListing(body);
   }, res, 201);
@@ -802,14 +757,36 @@ app.post('/api/listings/:id/deploy', (req: Request, res: Response) => {
     listing.cvDepositHash = listingCvDepositHash(listing);
     // Each listing gets its own vault instance + fresh PoR attestation; a
     // failed on-chain deploy leaves the listing in DRAFT with the real error.
-    const vault = canDeployStockVault()
-      ? await deployStockVaultForListing(listing)
-      : null;
-    const updated = deployListing(req.params.id, vault ? { contractId: vault.contractId } : undefined);
+    // On-chain: creates the Offering PDA + Token-2022 RWA mint + treasury ATA.
+    const created =
+      isProgramDeployed() && hasAdminSecret()
+        ? await createOfferingOnChain(
+            listing.id,
+            {
+              fideicomisoHash: Buffer.from(listing.cvDepositHash, 'hex').subarray(0, 32),
+              cnvRecordId: listing.dossier.cnvRecordId,
+              legalTermsUri: listing.dossier.legalTermsUri,
+            },
+            {
+              name: `${listing.dossier.legalName} (${listing.dossier.tokenTicker})`,
+              symbol: listing.dossier.tokenTicker.slice(0, 10),
+              uri: listing.dossier.legalTermsUri,
+            },
+          )
+        : null;
+    const updated = deployListing(
+      req.params.id,
+      created ? { contractId: created.offering.toBase58() } : undefined,
+    );
     return {
       ...updated,
-      onChain: vault
-        ? { hash: vault.hash, contractId: vault.contractId, explorer: explorerTx(vault.hash) }
+      onChain: created
+        ? {
+            hash: created.signature,
+            offering: created.offering.toBase58(),
+            rwaMint: created.rwaMint.toBase58(),
+            explorer: explorerTx(created.signature),
+          }
         : null,
     };
   }, res);
@@ -820,15 +797,17 @@ app.post('/api/listings/:id/mint', (req: Request, res: Response) => {
   wrapAsync(async () => {
     const amount = Number(req.body.amount);
     const listing = assertMintable(req.params.id, amount);
-    // On-chain mint against the listing's own vault happens first; if it
-    // fails the DB counter is left untouched and the real error surfaces.
-    const chain = await mintBackedStockOnChain(listing, amount);
+    // On-chain mint into the treasury ATA happens first; if it fails the DB
+    // counter is left untouched and the real error surfaces.
+    const hash = isOnChainListing(listing)
+      ? await mintSupplyOnChain(listing.id, BigInt(amount), Buffer.from(listing.cvDepositHash, 'hex').subarray(0, 32))
+      : null;
     // The deposit hash is fixed at deploy time — accepting one here would let
     // the ledger diverge from the hash the on-chain mint actually recorded.
     const updated = mintListingTokens(req.params.id, amount);
     return {
       ...updated,
-      onChain: chain ? { hash: chain.hash, explorer: explorerTx(chain.hash), to: chain.to } : null,
+      onChain: hash ? { hash, explorer: explorerTx(hash) } : null,
     };
   }, res);
 });
@@ -838,22 +817,30 @@ app.post('/api/listings/:id/licitacion', (req: Request, res: Response) => {
   wrapAsync(async () => {
     const opts = req.body || {};
     const { listing: draft, deadlineMs } = prepareOpenLicitacion(req.params.id, opts);
-    // Each offering gets its own instance, initialized with the company wallet
-    // as fiduciary, so there is nothing left to repoint afterwards.
-    const onChain = canDeployLicitacion() ? await deployLicitacionForListing(draft, deadlineMs) : undefined;
+    // Opening on-chain sets caps/price/deadline and the company wallet as
+    // fiduciary inside the same Offering PDA — nothing left to repoint.
+    let onChain: { contractId: string } | undefined;
+    let openHash: string | undefined;
+    if (isProgramDeployed() && hasAdminSecret() && isOnChainListing({ licitacionContract: draft.stockContract } as any)) {
+      openHash = await openOfferingOnChain({
+        listingId: draft.id,
+        fiduciary: new PublicKey(draft.dossier.proceedsWallet),
+        softCap: usdcToUnits(draft.dossier.offeringSoftCapUsdc),
+        hardCap: usdcToUnits(draft.dossier.offeringHardCapUsdc),
+        deadline: BigInt(Math.floor(deadlineMs / 1000)),
+        pricePerUnit: usdcToUnits(draft.dossier.pricePerShareUsdc),
+      });
+      onChain = { contractId: draft.stockContract };
+    }
     const listing = openLicitacion(req.params.id, opts, onChain);
     return {
       ...listing,
-      fiduciary: onChain
+      fiduciary: openHash
         ? {
-            hash: onChain.hash,
+            hash: openHash,
             fiduciary: listing.dossier.proceedsWallet,
-            paymentUnit: paymentUnit(listing),
-            usdcTrustlineReady: onChain.fiduciaryUsdcReady,
-            note:
-              onChain.fiduciaryUsdcReady === false
-                ? 'La wallet de cobro todavía no tiene trustline USDC: tiene que crearla antes del finalize o el pago falla on-chain.'
-                : null,
+            paymentUnit: 'USDC',
+            note: null,
           }
         : null,
     };
@@ -893,19 +880,21 @@ app.post('/api/listings/:id/refund', (req: Request, res: Response) => {
   wrapAsync(async () => {
     const listing = onChainListingOr404(req.params.id);
     const live = await requireFailedOffering(listing, account.publicKey);
-    const result = await refundOnChain(listing, account.id);
-    const user = markHoldingRefunded(account.id, listing.id, { hash: result.hash });
-    const unit = paymentUnit(listing);
+    const before = account.publicKey
+      ? await fetchContribution(listing.id, new PublicKey(account.publicKey)).catch(() => null)
+      : null;
+    const hash = await refundOnChainCustodial(listing.id, custodialSigningKeypair(account.id));
+    const user = markHoldingRefunded(account.id, listing.id, { hash });
     return {
       user,
-      refunded: result.refunded,
-      rwa: result.rwa,
+      refunded: before ? unitsToUsdc(before.amount) : 0,
+      rwa: before ? Number(before.units) : 0,
       onChain: {
         ...listingChainMeta(listing),
         ...live,
-        hash: result.hash,
-        explorer: explorerTx(result.hash),
-        note: `refund() devolvió tus ${unit} de testnet a tu wallet y quemó las unidades RWA en el contrato.`,
+        hash,
+        explorer: explorerTx(hash),
+        note: `refund() devolvió tus USDC de devnet a tu wallet y quemó las unidades RWA.`,
       },
     };
   }, res);
@@ -917,16 +906,15 @@ app.post('/api/listings/:id/withdraw-proceeds', (req: Request, res: Response) =>
     const listing = getListing(req.params.id);
     if (!listing) throw new Error('Listing no encontrado');
     if (!isOnChainListing(listing)) {
-      throw new Error('withdraw_proceeds es el reintento on-chain; esta licitación no tiene contrato Soroban');
+      throw new Error('withdraw_proceeds es el reintento on-chain; esta licitación no tiene Offering PDA');
     }
-    const result = await withdrawProceedsOnChain(listing);
+    const hash = await withdrawProceedsOnChain(listing.id);
     return {
       ...listing,
       onChain: {
         ...listingChainMeta(listing),
-        hash: result.hash,
-        explorer: explorerTx(result.hash),
-        amount: result.amount,
+        hash,
+        explorer: explorerTx(hash),
         note: 'Reintento de pago a la wallet fiduciaria. En el camino feliz finalize() ya pagó.',
       },
     };
@@ -941,8 +929,12 @@ app.post('/api/listings/:id/trustline', (req: Request, res: Response) => {
     const listing = getListing(req.params.id);
     if (listing && sdexAvailable(listing) && account.custodyMode === 'CUSTODIAL') {
       await openCustodialTrustline({ listingId: listing.id, accountId: account.id });
-    } else if (listing && sdexAvailable(listing) && account.publicKey && account.kycStatus === 'APPROVED') {
-      await syncHolderAuthorization(account.publicKey, true);
+    }
+    // Thaw the holder's ATA so transfers accept it — admin-signed compliance.
+    if (listing && isOnChainListing(listing) && account.publicKey && account.kycStatus === 'APPROVED') {
+      await setHolderFrozenOnChain(listing.id, new PublicKey(account.publicKey), false).catch(
+        (e) => console.warn('[thaw]', e?.message || e),
+      );
     }
     return user;
   }, res);
@@ -954,10 +946,9 @@ app.post('/api/listings/:id/claim', (req: Request, res: Response) => {
   wrapAsync(async () => {
     const listing = getListing(req.params.id);
     const user = claimListingTokens(account.id, req.params.id, listing?.status === 'CLOSED_SUCCESS');
-    const live = listing ? await snapshotLicitacion(listing, account.publicKey) : null;
-    // For SDEX-traded tokens, try to pay the units on-ledger right away. A
-    // self-custody wallet without a trustline simply reports the error — the
-    // holder can retry via /distribute once the line exists.
+    const snap = listing && isOnChainListing(listing) ? await fetchOffering(listing.id).catch(() => null) : null;
+    // For on-chain listings the units already sit in the holder's ATA; the
+    // distribution check just verifies the balance matches.
     const distribution =
       listing && sdexAvailable(listing)
         ? await distributeClaimedTokens({ listingId: listing.id, accountId: account.id }).catch(
@@ -970,11 +961,8 @@ app.post('/api/listings/:id/claim', (req: Request, res: Response) => {
       onChain: listing
         ? {
             ...listingChainMeta(listing),
-            ...live,
-            note:
-              listing.dossier.paymentKind === 'XLM'
-                ? 'Anotar en el portfolio no mueve XLM. Las unidades RWA ya existen en el contrato desde contribute(); finalize() pagó a la empresa.'
-                : 'Tokens acreditados en el ledger de la plataforma.',
+            ...(snap ? snapshotToApi(snap) : {}),
+            note: 'Las unidades RWA ya existen en tu ATA desde contribute(); finalize() pagó a la empresa.',
           }
         : undefined,
     };
@@ -1000,22 +988,16 @@ app.post('/api/listings/:id/distribute', (req: Request, res: Response) => {
 app.get('/api/admin/testnet', (req: Request, res: Response) => {
   if (!requireAdmin(req, res)) return;
   wrapAsync(async () => {
-    const deployment = loadTestnetDeployment();
+    const deployment = loadDeployment();
     return {
       ...getTestnetConfig(),
-      onChain: isOnChainDeployed(),
+      onChain: isProgramDeployed(),
       deployment,
       /**
-       * The issuer account the backend can sign for right now. New listings
-       * should default issuerPublicKey to this — pointing them at a wallet we
-       * cannot sign with leaves tokens permanently undistributable. Provision
-       * one on the spot when none exists so the admin UI always shows the
-       * signable issuer.
+       * The admin account the backend can sign for right now. New listings
+       * should default issuerPublicKey to this.
        */
-      activeIssuer:
-        platformIssuerPublicKey() ||
-        (await ensurePlatformIssuer().catch(() => null))?.publicKey() ||
-        null,
+      activeIssuer: adminPublicKey(),
     };
   }, res);
 });
@@ -1028,8 +1010,32 @@ app.post('/api/admin/testnet', (req: Request, res: Response) => {
 app.post('/api/admin/testnet/configure-issuer', (req: Request, res: Response) => {
   if (!requireAdmin(req, res)) return;
   wrapAsync(async () => {
-    const r: any = await configureIssuerForRegulatedAsset({ clawback: Boolean(req.body?.clawback) });
-    return { hash: r.hash, ledger: r.ledger };
+    // Solana equivalent of issuer flags config: initialize_platform records
+    // fee + KYC-hour enforcement on the platform PDA (one-time).
+    const hash = await initializePlatformOnChain({
+      feeBps: Number(req.body?.feeBps ?? 0),
+      enforceKycHours: req.body?.enforceKycHours != null ? Boolean(req.body.enforceKycHours) : true,
+    });
+    return { hash };
+  }, res);
+});
+
+/** Creates the Manifest market for a listing and thaws its vault. */
+app.post('/api/listings/:id/market', (req: Request, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+  wrapAsync(async () => {
+    const listing = getListing(req.params.id);
+    if (!listing) throw new Error('Listing no encontrado');
+    const [offeringPdaAddr] = (await import('./solana/pda')).offeringPda(listing.id);
+    const [rwaMint] = (await import('./solana/pda')).rwaMintPda(offeringPdaAddr);
+    const quote = usdcMint();
+    if (!quote) throw new Error('Falta el mint USDC configurado');
+    const market = await createMarket(rwaMint, quote);
+    if (market.market) {
+      await authorizeVault(listing.id, new PublicKey(market.market)).catch(() => undefined);
+      return setListingMarket(listing.id, market.market);
+    }
+    return listing;
   }, res);
 });
 
@@ -1041,14 +1047,19 @@ app.post('/api/listings/:id/contribute', (req: Request, res: Response) => {
     if (!listing) throw new Error('Listing no encontrado');
     const amount = Number(req.body.usdcAmount);
     if (isOnChainListing(listing)) {
-      const chain = await contributeOnChain(listing, account.id, amount);
+      const hash = await contributeOnChain(
+        listing.id,
+        custodialSigningKeypair(account.id),
+        usdcToUnits(amount),
+      );
+      const snap = await fetchOffering(listing.id).catch(() => null);
       recordOnChainContribution(listing.id, account.id, {
         amount,
-        tokens: chain.tokens,
-        raised: chain.raised,
+        tokens: listing.dossier.pricePerShareUsdc > 0 ? amount / listing.dossier.pricePerShareUsdc : 0,
+        raised: snap ? unitsToUsdc(snap.totalRaised) : amount,
       });
       const onChain = await receiptAfterContribute(listing.id, account.id, {
-        contributeHash: chain.hash,
+        contributeHash: hash,
       });
       // Hitting the hard cap is what the contract waits for; closing here is
       // what keeps the company from having to ask someone to press a button.
@@ -1065,11 +1076,11 @@ app.post('/api/listings/:id/contribute', (req: Request, res: Response) => {
 });
 
 /* ---------------------------------------------------------------- *
- * Self-custody (Freighter) path for the Soroban offering
+ * Self-custody (Phantom/Solflare/Backpack) path for the Anchor program
  *
- * `contribute` and `refund` run `require_auth` on the investor address, so
- * the wallet has to be the transaction source. `/prepare` returns the
- * simulated XDR and `/submit` relays it: the backend never holds the key.
+ * `contribute` and `refund` need the investor as transaction signer, so the
+ * wallet signs. `/prepare` returns a serialized unsigned transaction and
+ * `/submit` relays the signed one: the backend never holds the key.
  * ---------------------------------------------------------------- */
 
 app.post('/api/listings/:id/contribute/prepare', (req: Request, res: Response) => {
@@ -1077,26 +1088,33 @@ app.post('/api/listings/:id/contribute/prepare', (req: Request, res: Response) =
   if (!account) return res.status(401).json({ success: false, message: 'Iniciá sesión para suscribir' });
   wrapAsync(async () => {
     const listing = onChainListingOr404(req.params.id);
-    return prepareContributeXdr(listing, account.id, Number(req.body?.usdcAmount));
+    if (!account.publicKey) throw new Error('La cuenta no tiene wallet Solana asociada');
+    const transaction = await prepareContributeTx(
+      listing.id,
+      new PublicKey(account.publicKey),
+      usdcToUnits(Number(req.body?.usdcAmount)),
+    );
+    return { transaction };
   }, res);
 });
 
 app.post('/api/listings/:id/contribute/submit', (req: Request, res: Response) => {
   const account = getAccountByToken(req.headers.authorization);
   if (!account) return res.status(401).json({ success: false, message: 'Iniciá sesión para suscribir' });
-  const signedXdr = String(req.body?.xdr || '');
-  if (!signedXdr) return res.status(400).json({ success: false, message: 'Falta el XDR firmado' });
+  const signedTx = String(req.body?.transaction || req.body?.xdr || '');
+  if (!signedTx) return res.status(400).json({ success: false, message: 'Falta la transacción firmada' });
   wrapAsync(async () => {
     const listing = onChainListingOr404(req.params.id);
     const amount = Number(req.body?.usdcAmount);
-    const chain = await submitContributeXdr(listing, account.id, signedXdr);
+    const hash = await submitContributeTx(signedTx);
+    const snap = await fetchOffering(listing.id).catch(() => null);
     recordOnChainContribution(listing.id, account.id, {
       amount,
-      tokens: chain.tokens,
-      raised: chain.raised,
+      tokens: listing.dossier.pricePerShareUsdc > 0 ? amount / listing.dossier.pricePerShareUsdc : 0,
+      raised: snap ? unitsToUsdc(snap.totalRaised) : amount,
     });
     const onChain = await receiptAfterContribute(listing.id, account.id, {
-      contributeHash: chain.hash,
+      contributeHash: hash,
     });
     const closed = await autoFinalizeIfDue(listing.id);
     const updated = getListing(listing.id)!;
@@ -1110,30 +1128,35 @@ app.post('/api/listings/:id/refund/prepare', (req: Request, res: Response) => {
   wrapAsync(async () => {
     const listing = onChainListingOr404(req.params.id);
     await requireFailedOffering(listing, account.publicKey);
-    return prepareRefundXdr(listing, account.id);
+    if (!account.publicKey) throw new Error('La cuenta no tiene wallet Solana asociada');
+    const transaction = await prepareRefundTx(listing.id, new PublicKey(account.publicKey));
+    return { transaction };
   }, res);
 });
 
 app.post('/api/listings/:id/refund/submit', (req: Request, res: Response) => {
   const account = getAccountByToken(req.headers.authorization);
   if (!account) return res.status(401).json({ success: false, message: 'Iniciá sesión' });
-  const signedXdr = String(req.body?.xdr || '');
-  if (!signedXdr) return res.status(400).json({ success: false, message: 'Falta el XDR firmado' });
+  const signedTx = String(req.body?.transaction || req.body?.xdr || '');
+  if (!signedTx) return res.status(400).json({ success: false, message: 'Falta la transacción firmada' });
   wrapAsync(async () => {
     const listing = onChainListingOr404(req.params.id);
     const live = await requireFailedOffering(listing, account.publicKey);
-    const result = await submitRefundXdr(listing, account.id, signedXdr);
-    const user = markHoldingRefunded(account.id, listing.id, { hash: result.hash });
+    const before = account.publicKey
+      ? await fetchContribution(listing.id, new PublicKey(account.publicKey)).catch(() => null)
+      : null;
+    const hash = await submitRefundTx(signedTx);
+    const user = markHoldingRefunded(account.id, listing.id, { hash });
     return {
       user,
-      refunded: result.refunded,
-      rwa: result.rwa,
+      refunded: before ? unitsToUsdc(before.amount) : 0,
+      rwa: before ? Number(before.units) : 0,
       onChain: {
         ...listingChainMeta(listing),
         ...live,
-        hash: result.hash,
-        explorer: explorerTx(result.hash),
-        note: 'refund() devolvió el XLM de testnet a tu wallet Freighter y quemó las unidades RWA en el contrato.',
+        hash,
+        explorer: explorerTx(hash),
+        note: 'refund() devolvió tus USDC de devnet a tu wallet y quemó las unidades RWA.',
       },
     };
   }, res);
@@ -1170,27 +1193,27 @@ app.post('/api/orderbook/orders/:id/cancel', (req: Request, res: Response) => {
 });
 
 /* ---------------------------------------------------------------- *
- * Stellar DEX — the real central limit order book
+ * Manifest CLOB — the real on-chain central limit order book
  *
  * The `/api/orderbook/*` routes above remain the sandbox book for demos
- * without funded testnet accounts. These routes trade on-ledger, and the
- * backend never holds the investor's keys: order endpoints return an
- * unsigned XDR that the wallet signs, and `/submit` relays it.
+ * without a deployed program. These routes trade on-chain, and the backend
+ * never holds the investor's keys: order endpoints return a serialized
+ * unsigned transaction the wallet signs, `/submit` relays it.
  * ---------------------------------------------------------------- */
 
-app.get('/api/sdex/:listingId', (req: Request, res: Response) => {
+app.get('/api/manifest/:listingId', (req: Request, res: Response) => {
   const account = getAccountByToken(req.headers.authorization);
   wrapAsync(() => getSdexBook(req.params.listingId, account?.id), res);
 });
 
-app.post('/api/sdex/:listingId/orders/prepare', (req: Request, res: Response) => {
+app.post('/api/manifest/:listingId/orders/prepare', (req: Request, res: Response) => {
   const account = getAccountByToken(req.headers.authorization);
   if (!account) return res.status(401).json({ success: false, message: 'Iniciá sesión para operar' });
-  const { side, price, quantity, offerId } = req.body as {
+  const { side, price, quantity, clientOrderId } = req.body as {
     side: 'BUY' | 'SELL';
     price: number;
     quantity: number;
-    offerId?: string;
+    clientOrderId?: string;
   };
   wrapAsync(
     () =>
@@ -1200,21 +1223,20 @@ app.post('/api/sdex/:listingId/orders/prepare', (req: Request, res: Response) =>
         side,
         price: Number(price),
         quantity: Number(quantity),
-        offerId,
+        clientOrderId: clientOrderId ? BigInt(clientOrderId) : undefined,
       }),
     res,
   );
 });
 
 /** One-shot path for platform-custodied wallets: build, sign and submit. */
-app.post('/api/sdex/:listingId/orders', (req: Request, res: Response) => {
+app.post('/api/manifest/:listingId/orders', (req: Request, res: Response) => {
   const account = getAccountByToken(req.headers.authorization);
   if (!account) return res.status(401).json({ success: false, message: 'Iniciá sesión para operar' });
-  const { side, price, quantity, offerId } = req.body as {
+  const { side, price, quantity } = req.body as {
     side: 'BUY' | 'SELL';
     price: number;
     quantity: number;
-    offerId?: string;
   };
   wrapAsync(
     () =>
@@ -1224,38 +1246,28 @@ app.post('/api/sdex/:listingId/orders', (req: Request, res: Response) => {
         side,
         price: Number(price),
         quantity: Number(quantity),
-        offerId,
       }),
     res,
   );
 });
 
-app.post('/api/sdex/:listingId/orders/cancel', (req: Request, res: Response) => {
+app.post('/api/manifest/:listingId/orders/cancel', (req: Request, res: Response) => {
   const account = getAccountByToken(req.headers.authorization);
   if (!account) return res.status(401).json({ success: false, message: 'Iniciá sesión' });
-  const { side, offerId, price, legacy } = req.body as {
-    side: 'BUY' | 'SELL';
-    offerId: string;
-    price: number;
-    legacy?: boolean;
-  };
+  const { clientOrderId } = req.body as { clientOrderId: string };
+  if (!clientOrderId) return res.status(400).json({ success: false, message: 'Falta clientOrderId' });
   const params = {
     listingId: req.params.listingId,
     accountId: account.id,
-    side,
-    offerId: String(offerId),
-    price: Number(price),
-    legacy: Boolean(legacy),
+    clientOrderId: BigInt(clientOrderId),
   };
-  // Custodial accounts get the cancel already submitted; self-custody gets the
-  // XDR back to sign in their wallet.
   wrapAsync(
     () => (account.custodyMode === 'CUSTODIAL' ? cancelCustodialOrder(params) : prepareCancel(params)),
     res,
   );
 });
 
-app.post('/api/sdex/:listingId/trustline/prepare', (req: Request, res: Response) => {
+app.post('/api/manifest/:listingId/trustline/prepare', (req: Request, res: Response) => {
   const account = getAccountByToken(req.headers.authorization);
   if (!account) return res.status(401).json({ success: false, message: 'Iniciá sesión' });
   wrapAsync(
@@ -1263,18 +1275,18 @@ app.post('/api/sdex/:listingId/trustline/prepare', (req: Request, res: Response)
       prepareTrustline({
         listingId: req.params.listingId,
         accountId: account.id,
-        limit: req.body?.limit ? Number(req.body.limit) : undefined,
       }),
     res,
   );
 });
 
-app.post('/api/sdex/submit', (req: Request, res: Response) => {
+/** Relays any wallet-signed transaction (orders, ATA creation, contribute…). */
+app.post('/api/solana/submit', (req: Request, res: Response) => {
   const account = getAccountByToken(req.headers.authorization);
   if (!account) return res.status(401).json({ success: false, message: 'Iniciá sesión' });
-  const xdr = String(req.body?.xdr || '');
-  if (!xdr) return res.status(400).json({ success: false, message: 'Falta el XDR firmado' });
-  wrapAsync(() => submitSignedXdr(xdr), res);
+  const tx = String(req.body?.transaction || req.body?.xdr || '');
+  if (!tx) return res.status(400).json({ success: false, message: 'Falta la transacción firmada' });
+  wrapAsync(async () => ({ hash: await submitSignedTx(tx) }), res);
 });
 
 /** Repoints the wallet the company receives the raise in. */
@@ -1282,9 +1294,11 @@ app.post('/api/listings/:id/proceeds-wallet', (req: Request, res: Response) => {
   if (!requireAdmin(req, res)) return;
   wrapAsync(async () => {
     const listing = setListingProceedsWallet(req.params.id, String(req.body?.wallet || ''));
-    // Before the offering opens there is no instance of its own yet: the
-    // wallet goes straight into `initialize` when it is deployed.
-    const fiduciary = listing.status === 'LISTED' ? await syncFiduciaryOnChain(listing) : null;
+    // Before the offering opens the wallet goes straight into `open_offering`.
+    const fiduciary =
+      listing.status === 'LISTED' && isOnChainListing(listing)
+        ? await setFiduciaryOnChain(listing.id, new PublicKey(listing.dossier.proceedsWallet))
+        : null;
     return { ...listing, fiduciary };
   }, res);
 });
@@ -1307,14 +1321,11 @@ app.post('/api/listings/:id/dividends/claim', (req: Request, res: Response) => {
 app.get('/api/portfolio', async (req: Request, res: Response) => {
   const account = getAccountByToken(req.headers.authorization);
   if (!account) return res.status(401).json({ success: false, message: 'Iniciá sesión' });
-  // Any registered wallet heals on dashboard load: XLM refill for everyone,
-  // USDC trustline+grant for custodial, grant-only for self-custody that
-  // already opened the line.
+  // Any registered wallet heals on dashboard load: devnet SOL top-up plus
+  // the USDC grant for wallets that already have their ATA.
   if (account.publicKey) {
     try {
-      await ensureWalletFunded(account.publicKey, {
-        walletSecret: account.custodyMode === 'CUSTODIAL' ? custodialSigningKey(account.id) : null,
-      });
+      await ensureWalletFunded(account.publicKey);
     } catch (err: any) {
       console.warn('[wallet-heal]', err?.message || err);
     }
@@ -1323,17 +1334,34 @@ app.get('/api/portfolio', async (req: Request, res: Response) => {
 });
 
 /**
- * Reconciles one holder's on-chain authorization with their KYC status.
- *
- * Needed because the two drift in normal operation — an investor approved
- * before they created their trustline, or a Horizon call that failed during
- * the approval sweep.
+ * Reconciles one holder's on-chain state with their KYC status: verify or
+ * revoke the Investor PDA (platform-wide), then thaw/freeze the holder ATA
+ * per listing. Needed because the two drift in normal operation — an
+ * investor approved before they created their ATA, or an RPC call that
+ * failed during the approval sweep.
  */
 app.post('/api/admin/compliance/sync', (req: Request, res: Response) => {
   if (!requireAdmin(req, res)) return;
-  const { address, approved } = req.body as { address: string; approved: boolean };
+  const { address, approved, listingId } = req.body as {
+    address: string;
+    approved: boolean;
+    listingId?: string;
+  };
   if (!address) return res.status(400).json({ success: false, message: 'Falta la dirección' });
-  wrapAsync(() => syncHolderAuthorization(address, Boolean(approved)), res);
+  wrapAsync(async () => {
+    const wallet = new PublicKey(address);
+    const kycHash = approved
+      ? await verifyInvestorOnChain(wallet)
+      : null;
+    const results: Record<string, unknown> = { kycHash };
+    if (listingId) {
+      const listing = getListing(listingId);
+      if (listing && isOnChainListing(listing)) {
+        results.holderHash = await setHolderFrozenOnChain(listing.id, wallet, !approved);
+      }
+    }
+    return results;
+  }, res);
 });
 
 app.listen(Number(PORT), '0.0.0.0', () => {

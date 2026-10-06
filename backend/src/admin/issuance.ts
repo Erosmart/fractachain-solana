@@ -1,7 +1,8 @@
-import { loadTestnetDeployment } from '../stellar/deployment';
+import { loadDeployment } from '../solana/deployment';
+import { usdcMint } from '../solana/usdc';
 
 export type ProductKind = 'LICITACION' | 'FORWARD' | 'WARRANT' | 'STOCK';
-export type PaymentKind = 'XLM' | 'USDC' | 'USDT';
+export type PaymentKind = 'SOL' | 'USDC' | 'USDT';
 
 export interface IssuanceProduct {
   id: string;
@@ -20,27 +21,26 @@ const products: IssuanceProduct[] = [];
 let seq = 1;
 
 /**
- * Testnet defaults. Native XLM SAC is derived per-network; the USDC SAC is
- * read from deployments/testnet.json (the platform-issued faucet asset), so
- * this map always points at the same contract the licitaciones bill in.
+ * Payment mints on Solana. SOL means wrapped SOL (wSOL) once the offering is
+ * on-chain; USDC is read from SOLANA_USDC_MINT / deployments/<cluster>.json.
  * USDT is set from admin.
  */
-const DEFAULT_TESTNET_ASSETS: Record<PaymentKind, string> = {
-  XLM: 'native',
+const DEFAULT_PAYMENT_MINTS: Record<PaymentKind, string> = {
+  SOL: 'So11111111111111111111111111111111111111112',
   USDC: '',
   USDT: '',
 };
 
 export function getPaymentAssets(): Record<PaymentKind, string> {
   return {
-    ...DEFAULT_TESTNET_ASSETS,
-    USDC: DEFAULT_TESTNET_ASSETS.USDC || loadTestnetDeployment()?.usdcSac || '',
+    ...DEFAULT_PAYMENT_MINTS,
+    USDC: DEFAULT_PAYMENT_MINTS.USDC || usdcMint()?.toBase58() || loadDeployment()?.usdcMint || '',
   };
 }
 
 export function setPaymentAsset(kind: PaymentKind, address: string) {
-  DEFAULT_TESTNET_ASSETS[kind] = address;
-  return DEFAULT_TESTNET_ASSETS[kind];
+  DEFAULT_PAYMENT_MINTS[kind] = address;
+  return DEFAULT_PAYMENT_MINTS[kind];
 }
 
 export function listProducts(): IssuanceProduct[] {
@@ -60,7 +60,7 @@ export function createProduct(input: {
     kind: input.kind,
     name: input.name,
     paymentKind: input.paymentKind,
-    paymentTokenAddress: DEFAULT_TESTNET_ASSETS[input.paymentKind],
+    paymentTokenAddress: getPaymentAssets()[input.paymentKind],
     pricePerUnit: input.pricePerUnit || '0',
     contractAddress: input.contractAddress || 'PENDING_DEPLOY',
     active: true,

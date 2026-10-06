@@ -5,11 +5,9 @@ import { PaymentKind } from './issuance';
 import { persistToPg } from '../data/pgstore';
 import { addHolding, creditCash, debitCash, findAccountByPublicKey, getAccount, requireApprovedTrader } from '../auth/accounts';
 import { getTestnetConfig } from './testnet';
-import { StrKey } from '@stellar/stellar-sdk';
-import { isStellarPublicKey } from '../auth/stellar_testnet';
-import { loadTestnetDeployment } from '../stellar/deployment';
-import { isLiveContractId } from '../stellar/soroban';
-import { platformIssuerPublicKey } from '../stellar/keys';
+import { isSolanaPublicKey } from '../solana/keys';
+import { loadDeployment } from '../solana/deployment';
+import { adminPublicKey } from '../solana/keys';
 
 export type ListingStatus =
   | 'DRAFT'
@@ -74,9 +72,11 @@ export interface Listing {
   deployedAt?: string;
   mintedAt?: string;
   createdAt: string;
-  /** Stellar address that actually received the raise when the offering closed. */
+  /** Wallet Solana que recibió el recaudado cuando cerró la emisión. */
   proceedsPaidTo?: string;
   proceedsPaidAt?: string;
+  /** Manifest CLOB market address once the secondary is opened. */
+  manifestMarket?: string;
   /** Hash of the on-chain `finalize()` (or refund recovery) transaction. */
   finalizeHash?: string;
   finalizeAt?: string;
@@ -104,8 +104,14 @@ function save() {
 load();
 
 function contractId(seed: string) {
-  const h = crypto.createHash('sha256').update(seed).digest('hex').toUpperCase();
-  return `C${h.slice(0, 55)}`;
+  // Sandbox stand-in for an on-chain account address: a deterministic
+  // base58-looking string derived from the seed.
+  const h = crypto.createHash('sha256').update(seed).digest();
+  const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  let n = BigInt('0x' + h.toString('hex'));
+  let out = '';
+  while (n > 0n) { out = ALPHABET[Number(n % 58n)] + out; n /= 58n; }
+  return (out + ALPHABET[0].repeat(44)).slice(0, 44);
 }
 
 function hexHash(seed: string) {
@@ -134,8 +140,8 @@ function requireDossier(d: CompanyDossier) {
   // The raise is paid out to this address on-chain, so a typo here sends the
   // whole offering somewhere unrecoverable. Validate the checksum, not just
   // that the field is non-empty.
-  if (d.proceedsWallet && !isStellarPublicKey(d.proceedsWallet.trim())) {
-    throw new Error('La wallet que recibe la licitación no es una dirección Stellar válida (debe empezar con G)');
+  if (d.proceedsWallet && !isSolanaPublicKey(d.proceedsWallet.trim())) {
+    throw new Error('La wallet que recibe la licitación no es una dirección Solana válida (base58)');
   }
   if (
     d.proceedsWallet &&
@@ -176,16 +182,12 @@ export function createListing(dossier: CompanyDossier): Listing {
   if (listings.some((l) => l.dossier.ticker === ticker)) {
     throw new Error(`Ya existe un listing para ${ticker}`);
   }
-  const chain = loadTestnetDeployment();
+  const chain = loadDeployment();
   // Default to the issuer account the backend can actually sign with — the
   // deployments issuer belongs to a wallet we may not control, and issuing
   // under it would leave tokens undistributable (invisible in holders'
-  // wallets) unless STELLAR_ISSUER_SECRET is configured for it.
-  const issuer =
-    dossier.issuerPublicKey.trim() ||
-    platformIssuerPublicKey() ||
-    chain?.issuer ||
-    '';
+  // wallets) unless SOLANA_ISSUER_SECRET_KEY is configured for it.
+  const issuer = dossier.issuerPublicKey.trim() || adminPublicKey() || '';
   const listing: Listing = {
     id: `IPO-${ticker}-${Date.now().toString(36)}`,
     dossier: {
@@ -193,7 +195,7 @@ export function createListing(dossier: CompanyDossier): Listing {
       ticker,
       tokenTicker: dossier.tokenTicker.trim().toUpperCase(),
       issuerPublicKey: issuer,
-      proceedsWallet: dossier.proceedsWallet.trim().toUpperCase(),
+      proceedsWallet: dossier.proceedsWallet.trim(),
       paymentKind: dossier.paymentKind || 'USDC',
       jurisdiction: dossier.jurisdiction || 'Argentina',
       minInvestmentUsdc: dossier.minInvestmentUsdc && dossier.minInvestmentUsdc > 0 ? dossier.minInvestmentUsdc : 15000,
@@ -203,8 +205,8 @@ export function createListing(dossier: CompanyDossier): Listing {
     stockContract: '',
     licitacionContract: '',
     factoryProductId: null,
-    wasmStock: 'stock_vault.wasm',
-    wasmLicitacion: 'fractachain_licitacion.wasm',
+    wasmStock: '',
+    wasmLicitacion: '',
     tokensMinted: 0,
     sharesCustodied: 0,
     cvDepositHash: '',
@@ -218,7 +220,7 @@ export function createListing(dossier: CompanyDossier): Listing {
 
 /**
  * Pre-deploy validation, kept separate so the route can run it *before*
- * paying for the on-chain vault deploy: a failed Soroban call must not burn
+ * paying for the on-chain offering creation: a failed transaction must not burn
  * the listing's DRAFT state nor its ledger entry.
  */
 export function assertDeployable(id: string): Listing {
@@ -240,8 +242,8 @@ export function listingCvDepositHash(listing: Listing): string {
 
 export function deployListing(id: string, onChain?: { contractId: string }): Listing {
   const listing = assertDeployable(id);
-  const chain = loadTestnetDeployment();
-  listing.stockContract = onChain?.contractId || chain?.stockVault || contractId(`${listing.id}:stock`);
+  const chain = loadDeployment();
+  listing.stockContract = onChain?.contractId || '' ||contractId(`${listing.id}:stock`);
   // The licitación gets its own instance when the offering opens; pointing at
   // the shared one here made every listing inherit its payout wallet.
   listing.licitacionContract = '';
@@ -249,15 +251,15 @@ export function deployListing(id: string, onChain?: { contractId: string }): Lis
   listing.deployedAt = new Date().toISOString();
   listing.status = 'DEPLOYED';
   listing.cvDepositHash = listingCvDepositHash(listing);
-  if (!isStellarPublicKey(listing.dossier.issuerPublicKey)) {
-    listing.dossier.issuerPublicKey = platformIssuerPublicKey() || chain?.issuer || '';
+  if (!isSolanaPublicKey(listing.dossier.issuerPublicKey)) {
+    listing.dossier.issuerPublicKey = adminPublicKey() || '' || '';
   }
   save();
   return listing;
 }
 
 /**
- * Mint pre-checks run before the on-chain `mint_backed_stock` call so a
+ * Mint pre-checks run before the on-chain `mint_supply` call so a
  * rejected mint never leaves an orphaned balance on the vault.
  */
 export function assertMintable(id: string, amount: number): Listing {
@@ -295,7 +297,7 @@ export function prepareOpenLicitacion(id: string, opts?: SettleOpts): { listing:
   if (!listing) throw new Error('Listing no encontrado');
   if (listing.tokensMinted <= 0) throw new Error('Primero minteá los tokens respaldados 1:1');
   if (listing.status === 'LISTED') throw new Error('Ya está en licitación');
-  if (!isStellarPublicKey(listing.dossier.proceedsWallet)) {
+  if (!isSolanaPublicKey(listing.dossier.proceedsWallet)) {
     throw new Error('Configurá la wallet de cobro de la empresa antes de abrir la licitación');
   }
   const { settleAt } = resolveSettleChoice(opts);
@@ -325,18 +327,18 @@ export function openLicitacion(
 /**
  * Repoints the wallet that will receive the raise.
  *
- * Mirrors `set_fiduciary` in the licitación contract, including its guard:
+ * Mirrors `set_fiduciary` in the Anchor program, including its guard:
  * once money is in, the payout address is frozen. Changing it afterwards would
  * let the platform redirect funds investors already committed.
  */
 export function setListingProceedsWallet(id: string, wallet: string): Listing {
   const listing = listings.find((l) => l.id === id);
   if (!listing) throw new Error('Listing no encontrado');
-  const next = String(wallet || '').trim().toUpperCase();
-  if (!isStellarPublicKey(next)) {
-    throw new Error('La wallet que recibe la licitación no es una dirección Stellar válida (debe empezar con G)');
+  const next = String(wallet || '').trim();
+  if (!isSolanaPublicKey(next)) {
+    throw new Error('La wallet que recibe la licitación no es una dirección Solana válida (base58)');
   }
-  if (next === listing.dossier.issuerPublicKey?.trim().toUpperCase()) {
+  if (next === listing.dossier.issuerPublicKey?.trim()) {
     throw new Error('La wallet que cobra no puede ser la cuenta emisora del token');
   }
   if (listing.raisedUsdc > 0) {
@@ -424,8 +426,8 @@ export function validationPack(listing: Listing) {
       editable: listing.raisedUsdc === 0,
     },
     contracts: {
-      stockVault: listing.stockContract,
-      licitacion: listing.licitacionContract,
+      offering: listing.stockContract,
+      offeringPda: listing.licitacionContract,
       factoryProductId: listing.factoryProductId,
       wasmStock: listing.wasmStock,
       wasmLicitacion: listing.wasmLicitacion,
@@ -449,10 +451,10 @@ export function validationPack(listing: Listing) {
       { key: 'isin', ok: Boolean(d.isin), label: 'ISIN' },
       { key: 'cnv', ok: Boolean(d.cnvRecordId), label: 'Expediente CNV' },
       { key: 'caja', ok: Boolean(d.cajaSubaccount), label: 'Subcuenta Caja de Valores' },
-      { key: 'deploy', ok: Boolean(listing.stockContract), label: 'Contrato stock vault deployado' },
+      { key: 'deploy', ok: Boolean(listing.stockContract), label: 'Offering PDA creado' },
       { key: 'mint', ok: listing.tokensMinted > 0, label: 'Tokens 1:1 minteados' },
       { key: 'por', ok: listing.tokensMinted === listing.sharesCustodied && listing.tokensMinted > 0, label: 'Proof of reserve 1:1' },
-      { key: 'payout', ok: isStellarPublicKey(d.proceedsWallet), label: 'Wallet de cobro de la empresa' },
+      { key: 'payout', ok: isSolanaPublicKey(d.proceedsWallet), label: 'Wallet de cobro de la empresa' },
       { key: 'paid', ok: Boolean(listing.proceedsPaidAt) || listing.status !== 'CLOSED_SUCCESS', label: 'Fondos acreditados a la empresa' },
       { key: 'licitacion', ok: listing.status === 'LISTED', label: 'Licitación abierta' },
     ],
@@ -513,7 +515,7 @@ export function maybeCloseIfMinReached(id: string) {
 
 function applyDueClose(listing: Listing) {
   if (listing.status !== 'LISTED') return;
-  // The live Soroban contract only finalizes on hard cap or deadline.
+  // The live Solana program only finalizes on hard cap or deadline.
   if (isOnChainListing(listing)) return;
   const min = listing.dossier.offeringSoftCapUsdc || listing.dossier.minInvestmentUsdc || 0;
   const policy = listing.settlePolicy || 'ON_MIN';
@@ -538,18 +540,18 @@ function applyDueClose(listing: Listing) {
  * Mirrors `finalize` on the licitación contract, which pays `Fiduciary`
  * automatically. If that wallet belongs to a platform account we credit the
  * sandbox cash too, so the demo UI shows the money arriving without waiting
- * for a Horizon round-trip.
+ * for an RPC round-trip.
  */
 function payListingProceeds(listing: Listing) {
   if (listing.proceedsPaidAt) return;
   if (listing.status !== 'CLOSED_SUCCESS') return;
-  const wallet = listing.dossier.proceedsWallet?.trim().toUpperCase();
-  if (!isStellarPublicKey(wallet)) {
+  const wallet = listing.dossier.proceedsWallet?.trim();
+  if (!wallet || !isSolanaPublicKey(wallet)) {
     return;
   }
   listing.proceedsPaidTo = wallet;
   listing.proceedsPaidAt = new Date().toISOString();
-  // On-chain XLM already moved to the fiduciary in `finalize()`. Crediting
+  // On-chain SOL already moved to the fiduciary in `finalize()`. Crediting
   // sandbox USDC here would invent a second, fake payout.
   if (isOnChainListing(listing)) return;
   const company = findAccountByPublicKey(wallet);
@@ -559,25 +561,25 @@ function payListingProceeds(listing: Listing) {
 }
 
 export function isOnChainListing(listing: Listing): boolean {
-  // Any live Soroban instance counts — USDC offerings are on-chain too; the
-  // payment token was frozen inside the contract at initialize().
-  return isLiveContractId(listing.licitacionContract);
+  // The Offering PDA covers custody + primary sale + secondary; a valid
+  // base58 address here means the listing lives on-chain.
+  return isSolanaPublicKey(listing.licitacionContract);
 }
 
 export function bindLicitacionForDemo(
   id: string,
   contractId: string,
-  opts?: { factoryProductId?: number | null; paymentKind?: 'XLM' | 'USDC' },
+  opts?: { factoryProductId?: number | null; paymentKind?: 'SOL' | 'USDC' },
 ): Listing {
   const listing = listings.find((l) => l.id === id);
   if (!listing) throw new Error('Listing no encontrado');
-  if (!StrKey.isValidContract(contractId)) {
-    throw new Error(`Contract id inválido: ${contractId}`);
+  if (!isSolanaPublicKey(contractId)) {
+    throw new Error(`Dirección del offering inválida: ${contractId}`);
   }
   listing.licitacionContract = contractId;
   // Must match the token the contract was initialized with — the contract
   // itself rejects any other asset, so a wrong label just produces bad UX.
-  listing.dossier.paymentKind = opts?.paymentKind === 'USDC' ? 'USDC' : 'XLM';
+  listing.dossier.paymentKind = opts?.paymentKind === 'SOL' ? 'SOL' : 'USDC';
   listing.dossier.pricePerShareUsdc = 10;
   listing.dossier.minInvestmentUsdc = 100;
   listing.dossier.offeringSoftCapUsdc = 100;
@@ -633,6 +635,18 @@ export function markListingClosed(
   if (extra?.proceedsPaidTo) listing.proceedsPaidTo = extra.proceedsPaidTo;
   save();
   return getListing(id)!;
+}
+
+/** Records the Manifest market address once the secondary book exists. */
+export function setListingMarket(id: string, marketAddress: string): Listing {
+  const listing = getListing(id);
+  if (!listing) throw new Error('Listing no encontrado');
+  if (!isSolanaPublicKey(marketAddress)) {
+    throw new Error('Dirección de mercado Manifest inválida');
+  }
+  listing.manifestMarket = marketAddress;
+  save();
+  return listing;
 }
 
 export function recordFinalizeHash(id: string, hash: string | null | undefined): Listing {

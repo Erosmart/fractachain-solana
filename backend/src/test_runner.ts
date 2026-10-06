@@ -5,7 +5,7 @@ import { registerKyc, getAllKycRecords, approveKyc, rejectKyc } from './admin/ky
 import { processArsOnRamp, processCctpBridge } from './mocks/payment_gateway';
 import { getAllCommodityPrices } from './mocks/fiat_oracle';
 import { getMervalStocks } from './custody/stocks';
-import { canFinalizeFromSnapshot, parseLicitacionState } from './stellar/licitacion_state';
+import { canFinalizeFromSnapshot, parseOfferingState } from './solana/lifecycle_rules';
 import { settlementAction } from './market/settlement_rules';
 
 console.log('=== INICIANDO SUITE DE PRUEBAS DE FRACTACHAIN BACKEND ===');
@@ -40,7 +40,7 @@ assert(Boolean(authResult.token), 'Token de sesión JWT emitido');
 console.log('\n[2] Probando Consulta de Sesión con Token:');
 const userSession = getUserByToken(authResult.token);
 assert(userSession?.id === authResult.user.id, 'Token resuelve correctamente al usuario autenticado');
-assert(userSession?.custodialWallet === 'GD6CGAZZY4Z2HQAIBL4RHJJWHJULLCO5F5XW6VL3CECJWLDBCDKWB7KR', 'Wallet comitente de prueba asignada');
+assert(userSession?.custodialWallet === '5xot9PVkPHVfvWxvXzMhQq9rY5vWn1bVfQ7kQp8mE3xJ', 'Wallet comitente de prueba asignada');
 
 // Test 3: Logout
 console.log('\n[3] Probando Cierre de Sesión (Logout):');
@@ -77,7 +77,7 @@ const kycNormal = registerKyc({
   countryName: 'Argentina',
   address: 'Pergamino, Buenos Aires',
   investorType: 'National',
-  stellarAddress: 'GD6CGAZZY4Z2HQAIBL4RHJJWHJULLCO5F5XW6VL3CECJWLDBCDKWB7KR',
+  walletAddress: '5xot9PVkPHVfvWxvXzMhQq9rY5vWn1bVfQ7kQp8mE3xJ',
   documentFrontUrl: 'https://mock.storage/dni_front.png',
   selfieUrl: 'https://mock.storage/selfie.png',
 });
@@ -91,7 +91,7 @@ const kycGafi = registerKyc({
   countryName: 'Irán',
   address: 'Tehran',
   investorType: 'Foreign',
-  stellarAddress: 'GDIRAN11111111111111111111111111111111111111111111111111',
+  walletAddress: '3iRANkBxj2u9ZP5wQyhVgTnM8sDcR7fL4eJ6aK1pXoNt',
   documentFrontUrl: 'https://mock.storage/passport.png',
   selfieUrl: 'https://mock.storage/selfie.png',
 });
@@ -118,10 +118,10 @@ if (kycNormal.record?.id) {
 
 // Test 6: Mocks de Pagos y Oráculos
 console.log('\n[6] Probando Pasarelas Mock y Oráculos:');
-const arsOnramp = processArsOnRamp(145000, 'GD6CGAZZY4Z2HQAIBL4RHJJWHJULLCO5F5XW6VL3CECJWLDBCDKWB7KR');
+const arsOnramp = processArsOnRamp(145000, '5xot9PVkPHVfvWxvXzMhQq9rY5vWn1bVfQ7kQp8mE3xJ');
 assert(arsOnramp.success === true && arsOnramp.usdcAmount === 100, 'On-ramp ARS a 1450 calcula exactamente $100 USDC');
 
-const cctpBridge = processCctpBridge('arbitrum', 500, 'GD6CGAZZY4Z2HQAIBL4RHJJWHJULLCO5F5XW6VL3CECJWLDBCDKWB7KR');
+const cctpBridge = processCctpBridge('arbitrum', 500, '5xot9PVkPHVfvWxvXzMhQq9rY5vWn1bVfQ7kQp8mE3xJ');
 assert(cctpBridge.success === true, 'Bridge CCTP ejecutado');
 
 const prices = getAllCommodityPrices();
@@ -132,17 +132,17 @@ assert(stocks.some((s) => s.tokenTicker === 'tYPF'), 'Custodia de acciones Merva
 
 console.log('\n[7] Probando reglas de finalize (hard cap / deadline, no soft cap solo):');
 
-assert(parseLicitacionState({ tag: 'Successful' }) === 1, 'parseLicitacionState lee el tag Successful del SDK');
-assert(parseLicitacionState(0) === 0, 'parseLicitacionState acepta el entero Open');
+assert(parseOfferingState({ tag: 'Successful' }) === 3, 'parseOfferingState lee el tag Successful del SDK');
+assert(parseOfferingState(2) === 2, 'parseOfferingState acepta el entero Open');
 
-const hard = canFinalizeFromSnapshot({ state: 0, raised: 100, hardCap: 100, deadlineMs: Date.now() + 86_400_000 });
+const hard = canFinalizeFromSnapshot({ state: 2, raised: 100, hardCap: 100, deadlineMs: Date.now() + 86_400_000 });
 assert(hard.canFinalize && hard.reason === 'hard_cap', 'Hard cap alcanzado habilita finalize');
 
-const waiting = canFinalizeFromSnapshot({ state: 0, raised: 50, hardCap: 100, deadlineMs: Date.now() + 86_400_000 });
+const waiting = canFinalizeFromSnapshot({ state: 2, raised: 50, hardCap: 100, deadlineMs: Date.now() + 86_400_000 });
 assert(!waiting.canFinalize && waiting.reason === 'waiting', 'Soft cap (50/100) NO cierra si el deadline no venció');
 
 const late = canFinalizeFromSnapshot({
-  state: 0,
+  state: 2,
   raised: 10,
   hardCap: 100,
   deadlineMs: Date.now() - 1000,
@@ -150,7 +150,7 @@ const late = canFinalizeFromSnapshot({
 });
 assert(late.canFinalize && late.reason === 'deadline', 'Deadline vencido habilita finalize aunque falte hard cap');
 
-const closed = canFinalizeFromSnapshot({ state: 1, raised: 100, hardCap: 100, deadlineMs: null });
+const closed = canFinalizeFromSnapshot({ state: 3, raised: 100, hardCap: 100, deadlineMs: null });
 assert(!closed.canFinalize && closed.reason === 'already_closed', 'Successful no se vuelve a finalizar');
 
 console.log('\n[8] Probando el settlement automático:');

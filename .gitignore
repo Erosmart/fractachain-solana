@@ -34,3 +34,6 @@ agents_secrets.json
 !/README.md
 .agents/
 links.md
+deploy-keys/
+target/
+test-ledger/

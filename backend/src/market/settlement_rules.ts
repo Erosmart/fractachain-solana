@@ -1,6 +1,6 @@
 /**
  * Decision table for the automatic settlement, kept free of RPC and storage so
- * it can be tested: the expensive part (a Soroban simulation) only runs when
+ * it can be tested: the expensive part (una llamada RPC) only runs when
  * the listing is an open on-chain offering.
  */
 export type SettlementAction = 'settle_holders' | 'check_chain' | 'skip';

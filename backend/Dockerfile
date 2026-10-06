@@ -18,7 +18,8 @@ ENV PORT=8080
 COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
-COPY deployments/testnet.json ./deployments/testnet.json
+# solana/connection.ts resolves deployments/ three levels above dist/solana/ → /deployments
+COPY --chown=node:node deployments/devnet.json /deployments/devnet.json
 COPY backend/data ./data
 COPY backend/scripts ./scripts
 RUN mkdir -p data/selfies \

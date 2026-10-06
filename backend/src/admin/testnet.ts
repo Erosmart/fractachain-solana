@@ -1,15 +1,15 @@
 import fs from 'fs';
 import path from 'path';
 import { persistToPg } from '../data/pgstore';
+import { SOLANA_CLUSTER, SOLANA_RPC_URL } from '../solana/connection';
 
-export type TestnetMode = 'local' | 'faucet' | 'deploy';
+export type SolanaMode = 'local' | 'faucet' | 'deploy';
 
 export interface TestnetConfig {
-  mode: TestnetMode;
-  friendbot: boolean;
-  horizonUrl: string;
+  mode: SolanaMode;
+  faucet: boolean;
   rpcUrl: string;
-  networkPassphrase: string;
+  cluster: string;
   notes: string;
   settlePolicy: 'ON_MIN' | 'ON_DATE';
   settleAt?: string;
@@ -20,11 +20,10 @@ const FILE = path.join(__dirname, '..', '..', 'data', 'testnet.json');
 
 const DEFAULTS: TestnetConfig = {
   mode: 'deploy',
-  friendbot: true,
-  horizonUrl: 'https://horizon-testnet.stellar.org',
-  rpcUrl: 'https://soroban-testnet.stellar.org',
-  networkPassphrase: 'Test SDF Network ; September 2015',
-  notes: 'Testnet. Friendbot fondea XLM. Los IDs públicos de contratos están en deployments/testnet.json.',
+  faucet: true,
+  rpcUrl: SOLANA_RPC_URL,
+  cluster: SOLANA_CLUSTER,
+  notes: 'Devnet de Solana. El faucet airdropea SOL. La dirección del programa está en deployments/devnet.json.',
   settlePolicy: 'ON_MIN',
   settleAt: undefined,
   updatedAt: new Date().toISOString(),

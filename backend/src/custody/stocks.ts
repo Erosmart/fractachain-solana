@@ -12,7 +12,7 @@ export interface MervalStock {
   change24hPct: number;
   volume24hUsdc: number;
   custodiedSharesInCajaDeValores: number;
-  mintedTokensInStellar: number;
+  mintedTokens: number;
   reserveRatio: string; // '1:1 (100.0%)'
   lastAuditTimestamp: string;
   custodianCuit: string;
@@ -33,7 +33,7 @@ const SEED: Omit<MervalStock, 'active' | 'createdAt'>[] = [
     change24hPct: 3.42,
     volume24hUsdc: 482900,
     custodiedSharesInCajaDeValores: 50000,
-    mintedTokensInStellar: 50000,
+    mintedTokens: 50000,
     reserveRatio: '1:1 (100.0%)',
     lastAuditTimestamp: '',
     custodianCuit: '30-71829304-8',
@@ -48,7 +48,7 @@ const SEED: Omit<MervalStock, 'active' | 'createdAt'>[] = [
     change24hPct: -0.85,
     volume24hUsdc: 615000,
     custodiedSharesInCajaDeValores: 80000,
-    mintedTokensInStellar: 80000,
+    mintedTokens: 80000,
     reserveRatio: '1:1 (100.0%)',
     lastAuditTimestamp: '',
     custodianCuit: '30-71829304-8',
@@ -63,7 +63,7 @@ const SEED: Omit<MervalStock, 'active' | 'createdAt'>[] = [
     change24hPct: 1.75,
     volume24hUsdc: 230400,
     custodiedSharesInCajaDeValores: 25000,
-    mintedTokensInStellar: 25000,
+    mintedTokens: 25000,
     reserveRatio: '1:1 (100.0%)',
     lastAuditTimestamp: '',
     custodianCuit: '30-71829304-8',
@@ -78,7 +78,7 @@ const SEED: Omit<MervalStock, 'active' | 'createdAt'>[] = [
     change24hPct: 0.20,
     volume24hUsdc: 98000,
     custodiedSharesInCajaDeValores: 200000,
-    mintedTokensInStellar: 200000,
+    mintedTokens: 200000,
     reserveRatio: '1:1 (100.0%)',
     lastAuditTimestamp: '',
     custodianCuit: '30-71829304-8',
@@ -93,7 +93,7 @@ const SEED: Omit<MervalStock, 'active' | 'createdAt'>[] = [
     change24hPct: -1.20,
     volume24hUsdc: 175000,
     custodiedSharesInCajaDeValores: 15000,
-    mintedTokensInStellar: 15000,
+    mintedTokens: 15000,
     reserveRatio: '1:1 (100.0%)',
     lastAuditTimestamp: '',
     custodianCuit: '30-71829304-8',
@@ -108,7 +108,7 @@ const SEED: Omit<MervalStock, 'active' | 'createdAt'>[] = [
     change24hPct: 2.10,
     volume24hUsdc: 142000,
     custodiedSharesInCajaDeValores: 40000,
-    mintedTokensInStellar: 40000,
+    mintedTokens: 40000,
     reserveRatio: '1:1 (100.0%)',
     lastAuditTimestamp: '',
     custodianCuit: '30-71829304-8',
@@ -199,7 +199,7 @@ export function createStock(input: {
     change24hPct: 0,
     volume24hUsdc: 0,
     custodiedSharesInCajaDeValores: input.custodiedShares,
-    mintedTokensInStellar: input.custodiedShares,
+    mintedTokens: input.custodiedShares,
     reserveRatio: '1:1 (100.0%)',
     lastAuditTimestamp: new Date().toISOString(),
     custodianCuit: input.custodianCuit?.trim() || '30-71829304-8',
@@ -235,7 +235,7 @@ export function updateStockPrice(ticker: string, priceUsdc: number, change24hPct
 export function getProofOfReserveAudit() {
   const active = getMervalStocks();
   const totalShares = active.reduce((acc, s) => acc + s.custodiedSharesInCajaDeValores, 0);
-  const totalTokens = active.reduce((acc, s) => acc + s.mintedTokensInStellar, 0);
+  const totalTokens = active.reduce((acc, s) => acc + s.mintedTokens, 0);
 
   return {
     verified: totalShares === totalTokens,
@@ -245,6 +245,6 @@ export function getProofOfReserveAudit() {
     depositoryAgent: 'Caja de Valores S.A. (Subcuenta Comitente Fiduciaria 94921-A)',
     lastAuditDate: new Date().toISOString(),
     sha256AuditHash: 'a7b8c9d0e1f23456789abcdef0123456789abcdef0123456789abcdef0123456',
-    onChainAttestation: 'https://stellar.expert/explorer/testnet/tx/mock_por_attestation_daily',
+    onChainAttestation: 'https://explorer.solana.com/tx/mock_por_attestation_daily?cluster=devnet',
   };
 }

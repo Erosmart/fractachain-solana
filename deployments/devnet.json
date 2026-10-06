@@ -1,0 +1,11 @@
+{
+  "cluster": "devnet",
+  "programId": "Fractachain111111111111111111111111111111111",
+  "usdcMint": "",
+  "usdtMint": "",
+  "platform": "",
+  "markets": {},
+  "deployedAt": null,
+  "deployer": "",
+  "notes": "Placeholder — `anchor deploy` lo reemplaza con los valores reales. Ver SETUP_SOLANA.md."
+}

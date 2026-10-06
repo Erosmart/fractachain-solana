@@ -9,22 +9,22 @@
 import { getListing, listListings, type Listing } from '../admin/listings';
 import { economicShares, getAccount } from '../auth/accounts';
 import { getBook } from './orderbook';
-import { counterAsset, listingAsset, sdexAvailable } from './sdex_book';
-import { getOrderBook, getRecentTrades } from '../stellar/sdex';
+import { counterAsset, listingAsset, sdexAvailable } from './manifest_book';
+import { getBook as getManifestBook } from '../solana/manifest';
 import { listDividends } from './dividends';
-import { loadAssetBalance, loadNativeXlm } from '../auth/stellar_testnet';
-import { explorerTx } from '../stellar/onchain';
-import { usdcIssuerPublicKey } from '../stellar/keys';
+import { loadSolBalance, loadTokenBalance, loadUsdcBalance } from '../auth/solana_devnet';
+import { explorerTx } from '../solana/onchain';
+import { usdcMint } from '../solana/usdc';
+import { isSolanaPublicKey } from '../solana/keys';
 
-// Canonical platform USDC issuer: env secret/pubkey first, then
-// deployments/testnet.json. Falling back to the Circle issuer here would make
-// the portfolio and the SDEX quote a different asset than the one licitaciones
-// actually charge.
+// Canonical platform USDC mint: SOLANA_USDC_MINT env first, then
+// deployments/<cluster>.json.
 function usdcIssuer(): string | null {
-  return usdcIssuerPublicKey();
+  return usdcMint()?.toBase58() || null;
 }
 
 export type PriceSource = 'sdex_last' | 'sdex_mid' | 'sandbox_last' | 'ipo';
+// 'sdex_*' keys kept for API stability — they now mean Manifest CLOB.
 
 export interface MarketQuote {
   listingId: string;
@@ -36,8 +36,8 @@ export interface MarketQuote {
 }
 
 const SOURCE_LABEL: Record<PriceSource, string> = {
-  sdex_last: 'Último cruce SDEX',
-  sdex_mid: 'Mid del libro SDEX',
+  sdex_last: 'Último cruce Manifest',
+  sdex_mid: 'Mid del libro Manifest',
   sandbox_last: 'Último cruce (sandbox)',
   ipo: 'Precio de la licitación',
 };
@@ -56,21 +56,15 @@ export async function quoteListing(listing: Listing): Promise<MarketQuote> {
 
   if (sdexAvailable(listing)) {
     try {
-      const security = listingAsset(listing);
-      const counter = counterAsset();
-      const [book, trades] = await Promise.all([
-        getOrderBook(security, counter).catch(() => null),
-        getRecentTrades(security, counter, 5).catch(() => [] as Awaited<ReturnType<typeof getRecentTrades>>),
-      ]);
-      const last = trades[0];
-      if (last && last.price > 0) {
-        return { ...base, price: last.price, source: 'sdex_last', asOf: last.createdAt };
-      }
+      const book = await getManifestBook(listing.manifestMarket!).catch(() => null);
       if (book?.midPrice && book.midPrice > 0) {
         return { ...base, price: book.midPrice, source: 'sdex_mid', asOf: new Date().toISOString() };
       }
+      if (book?.bestBid && book.bestBid > 0) {
+        return { ...base, price: book.bestBid, source: 'sdex_mid', asOf: new Date().toISOString() };
+      }
     } catch {
-      // Horizon down: fall through to the local book rather than blanking the portfolio.
+      // RPC down: fall through to the local book rather than blanking the portfolio.
     }
   }
 
@@ -101,7 +95,7 @@ export async function buildPortfolio(accountId: string) {
   if (!account) throw new Error('Cuenta no encontrada');
 
   const listings = listListings();
-  const [positions, usdcOnChain, xlmOnChain] = await Promise.all([
+  const [positions, usdcOnChain, solOnChain] = await Promise.all([
     Promise.all(
     (account.holdings || []).map(async (h) => {
       const listing = listings.find((l) => l.id === h.listingId) || getListing(h.listingId);
@@ -120,7 +114,7 @@ export async function buildPortfolio(accountId: string) {
       const costBasis = Math.round((h.usdcAmount || 0) * 1e6) / 1e6;
       const pnl = Math.round((marketValue - costBasis) * 1e6) / 1e6;
       const pendingDividendUsdc = Math.round((h.pendingDividendUsdc || 0) * 1e6) / 1e6;
-      const onChain = listing ? listing.dossier.paymentKind === 'XLM' : false;
+      const onChain = listing ? Boolean(listing.licitacionContract && isSolanaPublicKey(listing.licitacionContract)) : false;
       const listingStatus = listing?.status || 'UNKNOWN';
       return {
         listingId: h.listingId,
@@ -152,19 +146,19 @@ export async function buildPortfolio(accountId: string) {
     }),
     ),
     account.publicKey && usdcIssuer()
-      ? loadAssetBalance(account.publicKey, 'USDC', usdcIssuer()!)
+      ? loadUsdcBalance(account.publicKey)
       : Promise.resolve(0),
-    account.publicKey ? loadNativeXlm(account.publicKey) : Promise.resolve(0),
+    account.publicKey ? loadSolBalance(account.publicKey) : Promise.resolve(0),
   ]);
 
-  // On-chain truth: SDEX buys never touch the local holdings ledger, so the
-  // wallet's classic token balance per tradable listing is the source of
+  // On-chain truth: Manifest buys never touch the local holdings ledger, so
+  // the wallet's Token-2022 ATA balance per tradable listing is the source of
   // truth for what they actually hold and can sell.
   if (account.publicKey) {
     const tradable = listings.filter((l) => sdexAvailable(l));
     const onChainBals = await Promise.all(
       tradable.map((l) =>
-        loadAssetBalance(account.publicKey!, l.dossier.tokenTicker, l.dossier.issuerPublicKey)
+        loadTokenBalance(account.publicKey!, listingAsset(l).toBase58(), true)
           .then((b) => [l.id, b] as const)
           .catch(() => [l.id, 0] as const),
       ),
@@ -215,11 +209,11 @@ export async function buildPortfolio(accountId: string) {
   }
 
   // What the company sees: the offerings whose raise is paid into this wallet.
-  // Without this the issuer only saw sandbox USDC and concluded the XLM never
+  // Without this the issuer only saw sandbox USDC and concluded the SOL never
   // arrived, when `finalize()` had already sent it on ledger.
   const proceeds = account.publicKey
     ? listings
-        .filter((l) => l.dossier.proceedsWallet?.toUpperCase() === account.publicKey?.toUpperCase())
+        .filter((l) => l.dossier.proceedsWallet?.trim() === account.publicKey?.trim())
         .map((l) => ({
           listingId: l.id,
           tokenTicker: l.dossier.tokenTicker,
@@ -241,7 +235,8 @@ export async function buildPortfolio(accountId: string) {
   return {
     cashUsdc: account.cashUsdc,
     usdcOnChain,
-    xlmOnChain,
+    solOnChain,
+    xlmOnChain: solOnChain, // legacy key kept for API compatibility
     proceeds,
     positions,
     totals: {

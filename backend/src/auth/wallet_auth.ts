@@ -1,13 +1,16 @@
-import { Keypair, StrKey } from '@stellar/stellar-sdk';
+import nacl from 'tweetnacl';
+import bs58 from 'bs58';
+import { PublicKey } from '@solana/web3.js';
 import { upsertWalletLogin, linkSelfCustodyWallet } from './accounts';
+import { isSolanaPublicKey } from '../solana/keys';
 
 const LOGIN_PREFIX = 'fractachain-login:';
 const LINK_PREFIX = 'fractachain-link:';
 const MAX_AGE_MS = 5 * 60 * 1000;
 
 function verifySignature(publicKey: string, message: string, signature: string, prefix: string) {
-  if (!StrKey.isValidEd25519PublicKey(publicKey)) {
-    return 'Public key Stellar inválida';
+  if (!isSolanaPublicKey(publicKey)) {
+    return 'Public key Solana inválida';
   }
   const ts = Number(message.slice(prefix.length));
   if (!message.startsWith(prefix) || !Number.isFinite(ts) || Math.abs(Date.now() - ts) > MAX_AGE_MS) {
@@ -15,11 +18,19 @@ function verifySignature(publicKey: string, message: string, signature: string, 
   }
   let ok = false;
   try {
-    const kp = Keypair.fromPublicKey(publicKey);
-    const sig = Buffer.from(signature, 'base64');
-    // Freighter firma con SEP-53: SHA-256("Stellar Signed Message:\n" + msg).
-    // Se acepta también la firma cruda del mensaje para compatibilidad.
-    ok = kp.verifyMessage(message, sig) || kp.verify(Buffer.from(message, 'utf8'), sig);
+    const pk = new PublicKey(publicKey);
+    // Phantom/Solflare/Backpack signMessage returns base58; accept base64 too.
+    let sig: Uint8Array;
+    try {
+      sig = bs58.decode(signature);
+    } catch {
+      sig = Buffer.from(signature, 'base64');
+    }
+    ok = nacl.sign.detached.verify(
+      new TextEncoder().encode(message),
+      sig,
+      pk.toBytes(),
+    );
   } catch {
     ok = false;
   }
@@ -43,7 +54,7 @@ export function authenticateWithWallet(payload: {
 }
 
 /**
- * Vincula una wallet Freighter a una cuenta ya logueada (email/Google).
+ * Vincula una wallet Solana a una cuenta ya logueada (email/Google).
  * La firma prueba que el inversor controla la clave antes de guardarla.
  */
 export function linkWalletSignature(
