@@ -7,18 +7,20 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "node --use-system-ca ./node_modules/ts-node-dev/lib/bin.js --respawn --transpile-only src/server.ts",
-    "test": "node --use-system-ca ./node_modules/ts-node/dist/bin.js src/test_runner.ts",
-    "deploy:licitacion": "node --use-system-ca ./node_modules/ts-node/dist/bin.js src/stellar/deploy_licitacion.ts",
-    "deploy:forward-warrant": "node --use-system-ca ./node_modules/ts-node/dist/bin.js src/stellar/deploy_forward_warrant.ts"
+    "test": "node --use-system-ca ./node_modules/ts-node/dist/bin.js src/test_runner.ts"
   },
   "dependencies": {
-    "@stellar/stellar-sdk": "^17.1.0",
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.95.0",
+    "bs58": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
+    "@types/bs58": "^4.0.4",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.11.0",

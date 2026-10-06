@@ -61,7 +61,7 @@ export interface StockCustody {
 }
 
 export type ProductKind = 'LICITACION' | 'FORWARD' | 'WARRANT' | 'STOCK';
-export type PaymentKind = 'XLM' | 'USDC' | 'USDT';
+export type PaymentKind = 'SOL' | 'USDC' | 'USDT';
 
 export interface IssuanceProduct {
   id: string;

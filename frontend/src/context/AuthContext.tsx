@@ -26,7 +26,8 @@ export interface User {
   holdings?: { listingId: string; tokenTicker: string; usdcAmount: number; tokens: number; tokensOwed?: number; tokensOnChain?: number; pendingDividendUsdc?: number; refundedAt?: string; refundHash?: string }[];
   trustlines?: string[];
   cashUsdc?: number;
-  xlmBalance?: number;
+  solBalance?: number;
+  xlmBalance?: number; // legacy alias
   faucetFunded?: boolean;
   isAdmin?: boolean;
 }
@@ -40,7 +41,7 @@ interface AuthContextType {
   loginWithWallet: () => Promise<User>;
   loginWithEmail: (email: string, password: string, name?: string) => Promise<User>;
   chooseCustody: (mode: 'CUSTODIAL' | 'SELF', publicKey?: string) => Promise<void>;
-  linkFreighterWallet: () => Promise<void>;
+  linkSolanaWallet: () => Promise<void>;
   submitKyc: (payload: { legalName: string; cuit: string; selfieDataUrl?: string; email?: string }) => Promise<void>;
   approveToken: (listingId: string) => Promise<void>;
   claimTokens: (listingId: string) => Promise<any>;
@@ -68,7 +69,7 @@ const AuthContext = createContext<AuthContextType>({
     throw new Error('no session');
   },
   chooseCustody: async () => {},
-  linkFreighterWallet: async () => {},
+  linkSolanaWallet: async () => {},
   submitKyc: async () => {},
   approveToken: async () => {},
   claimTokens: async () => {},
@@ -104,7 +105,7 @@ function normalize(raw: any, fallback?: Partial<User>): User {
     holdings: raw.holdings || [],
     trustlines: raw.trustlines || [],
     cashUsdc: typeof raw.cashUsdc === 'number' ? raw.cashUsdc : 0,
-    xlmBalance: typeof raw.xlmBalance === 'number' ? raw.xlmBalance : 0,
+          solBalance: typeof raw.solBalance === 'number' ? raw.solBalance : typeof raw.xlmBalance === 'number' ? raw.xlmBalance : 0,
     faucetFunded: Boolean(raw.faucetFunded),
     isAdmin: Boolean(raw.isAdmin),
   };
@@ -197,9 +198,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithWallet = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { freighterLoginPayload } = await import('../lib/freighter');
-      const payload = await freighterLoginPayload();
-      const res = await fetch(`${API_BASE_URL}/api/auth/freighter`, {
+      const { solanaLoginPayload } = await import('../lib/solanaWallet');
+      const payload = await solanaLoginPayload();
+      const res = await fetch(`${API_BASE_URL}/api/auth/wallet-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -248,10 +249,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [applySession]);
 
-  const linkFreighterWallet = useCallback(async () => {
+  const linkSolanaWallet = useCallback(async () => {
     if (!token) throw new Error(tClient('err.signIn'));
-    const { freighterLinkPayload } = await import('../lib/freighter');
-    const payload = await freighterLinkPayload();
+    const { solanaLinkPayload } = await import('../lib/solanaWallet');
+    const payload = await solanaLinkPayload();
     const res = await fetch(`${API_BASE_URL}/api/auth/wallet/link`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -298,13 +299,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // La ATA vive en la wallet del inversor: solo su firma la puede
       // crear. Después registramos el opt-in y el emisor la autoriza.
       await signAndRelay({
-        prepare: `/api/sdex/${listingId}/trustline/prepare`,
-        submit: '/api/sdex/submit',
+        prepare: `/api/manifest/${listingId}/trustline/prepare`,
+        submit: '/api/solana/submit',
         token,
       }).catch((err: any) => {
         // Sin cuenta emisora todavía no hay asset que aprobar: el opt-in queda
         // registrado en la plataforma y la ATA se crea cuando exista.
-        if (/no cotiza en el DEX/i.test(err?.message || '')) return null;
+        if (/no cotiza|mercado Manifest/i.test(err?.message || '')) return null;
         throw err;
       });
     }
@@ -413,7 +414,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loginWithWallet,
       loginWithEmail,
       chooseCustody,
-      linkFreighterWallet,
+      linkSolanaWallet,
       submitKyc,
       approveToken,
       claimTokens,
@@ -434,7 +435,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loginWithWallet,
       loginWithEmail,
       chooseCustody,
-      linkFreighterWallet,
+      linkSolanaWallet,
       submitKyc,
       approveToken,
       claimTokens,

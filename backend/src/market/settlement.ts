@@ -1,7 +1,7 @@
 /**
  * Closing and settlement of an offering without anyone pressing a button.
  *
- * Soroban has no scheduler: `finalize()` is an ordinary invocation that some
+ * Solana has no scheduler: `finalize()` is an ordinary transaction that some
  * client has to send. Until it lands the money stays in the contract, so the
  * company never sees it and the investor's position looks pending. This module
  * is that client — it runs `finalize()` as soon as the contract allows it
@@ -17,15 +17,12 @@ import {
   listListings,
   markListingClosed,
 } from '../admin/listings';
-import {
-  alreadyClosedOnChain,
-  closeStatusFromChain,
-  finalizeOnChain,
-  paymentUnit,
-  snapshotLicitacion,
-} from '../stellar/licitacion';
-import { explorerTx, listingChainMeta } from '../stellar/onchain';
-import { distributeClaimedTokens, sdexAvailable } from './sdex_book';
+import { finalizeOnChain } from '../solana/offering';
+import { fetchOffering } from '../solana/offering_state';
+import { adminKeypair } from '../solana/keys';
+import { unitsToUsdc } from '../solana/usdc';
+import { explorerTx, listingChainMeta, snapshotToApi } from '../solana/onchain';
+import { distributeClaimedTokens, sdexAvailable } from './manifest_book';
 import { settlementAction } from './settlement_rules';
 
 const SWEEP_MS = Number(process.env.SETTLEMENT_SWEEP_MS || 60_000);
@@ -41,9 +38,9 @@ export type SettlementResult = {
  * Credits the units of every contributor of a successful offering.
  *
  * The units already exist on chain since `contribute()`; what is pending is
- * the platform-ledger entry and, for listings with a real issuing account,
- * the classic asset that makes the position visible in a wallet. Self-custody
- * holders still have to sign their own trustline, so their distribution is
+ * the platform-ledger entry and, for listings with a Manifest market, the
+ * ATA balance check that makes the position visible in a wallet. Self-custody
+ * holders may still need to create their ATA, so their distribution is
  * reported as an error and retried from `/distribute`.
  */
 export async function settleHolders(listing: Listing): Promise<SettlementResult[]> {
@@ -93,40 +90,42 @@ export async function finalizeListedOffering(listingId: string) {
     return { ...closed, settlements };
   }
 
-  const live = await snapshotLicitacion(listing);
-  if (alreadyClosedOnChain(live)) {
-    const status = closeStatusFromChain(live, listing);
-    if (!status) throw new Error('Estado on-chain ilegible');
-    const updated = markListingClosed(listing.id, status, live.raised, {
+  const snap = await fetchOffering(listing.id);
+  if (snap && (snap.state === 'Successful' || snap.state === 'Failed')) {
+    const status = snap.state === 'Successful' ? 'CLOSED_SUCCESS' : 'CLOSED_FAILED';
+    const raised = unitsToUsdc(snap.totalRaised);
+    const updated = markListingClosed(listing.id, status, raised, {
       finalizeHash: listing.finalizeHash,
-      proceedsPaidTo: live.fiduciary,
+      proceedsPaidTo: snap.fiduciary.toBase58(),
     });
     return {
       ...updated,
       settlements: await settleHolders(updated),
       onChain: {
         ...listingChainMeta(updated),
-        ...live,
+        ...snapshotToApi(snap),
         hash: listing.finalizeHash || null,
         explorer: explorerTx(listing.finalizeHash),
         alreadyClosed: true,
         note:
-          live.state === 1
-            ? `La emisión ya estaba Successful. Los ${paymentUnit(listing)} de testnet fueron a la wallet fiduciaria en finalize(); no hay un segundo payout al inversor.`
-            : `La emisión ya estaba Failed. El inversor puede llamar refund() para recuperar ${paymentUnit(listing)}.`,
+          snap.state === 'Successful'
+            ? `La emisión ya estaba Successful. Los USDC de devnet fueron a la wallet fiduciaria en finalize(); no hay un segundo payout al inversor.`
+            : `La emisión ya estaba Failed. El inversor puede llamar refund() para recuperar USDC.`,
       },
     };
   }
 
-  const result = await finalizeOnChain(listing);
-  const success = result.state === 1;
+  const result = await finalizeOnChain(listing.id, adminKeypair());
+  const snapAfter = await fetchOffering(listing.id);
+  const success = snapAfter?.state === 'Successful';
+  const raised = snapAfter ? unitsToUsdc(snapAfter.totalRaised) : listing.raisedUsdc;
   const updated = markListingClosed(
     listing.id,
     success ? 'CLOSED_SUCCESS' : 'CLOSED_FAILED',
-    result.raised,
+    raised,
     {
-      finalizeHash: result.hash,
-      proceedsPaidTo: result.fiduciary,
+      finalizeHash: result,
+      proceedsPaidTo: snapAfter?.fiduciary.toBase58(),
     },
   );
   return {
@@ -134,12 +133,13 @@ export async function finalizeListedOffering(listingId: string) {
     settlements: await settleHolders(updated),
     onChain: {
       ...listingChainMeta(updated),
-      ...result,
-      explorer: explorerTx(result.hash),
+      ...(snapAfter ? snapshotToApi(snapAfter) : {}),
+      hash: result,
+      explorer: explorerTx(result),
       alreadyClosed: false,
       note: success
-        ? `finalize() pagó los ${paymentUnit(listing)} recaudados a la wallet fiduciaria (proceeds) y las unidades quedaron acreditadas al inversor. No hace falta reclamar nada.`
-        : `finalize() dejó Failed (no se llegó al soft cap). El inversor recupera ${paymentUnit(listing)} con refund().`,
+        ? `finalize() pagó los USDC recaudados a la wallet fiduciaria (proceeds) y las unidades quedaron acreditadas al inversor. No hace falta reclamar nada.`
+        : `finalize() dejó Failed (no se llegó al soft cap). El inversor recupera USDC con refund().`,
     },
   };
 }
@@ -162,8 +162,11 @@ export async function autoFinalizeIfDue(listingId: string) {
     if (action === 'settle_holders') {
       return { ...listing, settlements: await settleHolders(listing) };
     }
-    const live = await snapshotLicitacion(listing);
-    if (!live.canFinalize && !alreadyClosedOnChain(live)) return null;
+    const snap = await fetchOffering(listing.id);
+    if (!snap) return null;
+    const closed = snap.state === 'Successful' || snap.state === 'Failed';
+    const due = snap.state === 'Open' && (snap.totalRaised >= snap.hardCap || BigInt(Math.floor(Date.now() / 1000)) >= snap.deadline);
+    if (!closed && !due) return null;
     return await finalizeListedOffering(listing.id);
   } catch (err: any) {
     console.warn(`[settlement] ${listingId}: ${err?.message || err}`);

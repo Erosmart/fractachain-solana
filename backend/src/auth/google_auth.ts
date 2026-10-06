@@ -22,7 +22,7 @@ const DEMO_USER: AuthUser = {
   email: 'inversor@fractachain.com',
   name: 'Inversor Institucional',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=128&h=128&fit=crop&crop=faces',
-  custodialWallet: 'GD6CGAZZY4Z2HQAIBL4RHJJWHJULLCO5F5XW6VL3CECJWLDBCDKWB7KR',
+  custodialWallet: '5xot9PVkPHVfvWxvXzMhQq9rY5vWn1bVfQ7kQp8mE3xJ',
   kycStatus: 'APPROVED',
   authProvider: 'google',
   createdAt: new Date().toISOString(),
@@ -71,7 +71,7 @@ export function authenticateWithGoogle(payload: {
       name,
       avatar,
       // Assign default testnet wallet or generate custodial address
-      custodialWallet: 'GD6CGAZZY4Z2HQAIBL4RHJJWHJULLCO5F5XW6VL3CECJWLDBCDKWB7KR',
+      custodialWallet: '5xot9PVkPHVfvWxvXzMhQq9rY5vWn1bVfQ7kQp8mE3xJ',
       kycStatus: 'APPROVED',
       authProvider: 'google',
       createdAt: now,

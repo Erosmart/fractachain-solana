@@ -1,6 +1,7 @@
-import { grantHolderAuthorization, revokeHolderAuthorization } from '../stellar/compliance';
-import { isOnChainListing, listListings } from './listings';
-import { verifyInvestorOnChain } from '../stellar/licitacion';
+import { PublicKey } from '@solana/web3.js';
+import { verifyInvestorOnChain, revokeInvestorOnChain } from '../solana/kyc';
+import { isSolanaPublicKey } from '../solana/keys';
+
 
 export type InvestorType = 'National' | 'Foreign' | 'Qualified' | 'Institutional';
 export type KycStatus = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | 'REVOCADO';
@@ -15,7 +16,7 @@ export interface KycRecord {
   countryName: string;
   address: string;
   investorType: InvestorType;
-  stellarAddress: string;
+  walletAddress: string;
   documentFrontUrl: string;
   documentBackUrl?: string;
   selfieUrl: string;
@@ -48,7 +49,7 @@ let kycDatabase: KycRecord[] = [
     countryName: 'Argentina',
     address: 'Av. Libertador 4520, CABA',
     investorType: 'National',
-    stellarAddress: 'GD6CGAZZY4Z2HQAIBL4RHJJWHJULLCO5F5XW6VL3CECJWLDBCDKWB7KR',
+    walletAddress: '5xot9PVkPHVfvWxvXzMhQq9rY5vWn1bVfQ7kQp8mE3xJ',
     documentFrontUrl: '/mock/dni_front.jpg',
     documentBackUrl: '/mock/dni_back.jpg',
     selfieUrl: '/mock/selfie_esteban.jpg',
@@ -66,7 +67,7 @@ let kycDatabase: KycRecord[] = [
     countryName: 'Francia',
     address: '14 Rue Saint-Honoré, París',
     investorType: 'Foreign',
-    stellarAddress: 'GB7B2W5UHYQNVVTXRH3Y3E7QO5R7ZPJ4N6J2W3K5E6M8X9Z1A2B3C4D5',
+    walletAddress: '7yL4bN2wHjK8sPqR3tF9uXcV5zE6dG1aM8nB4vC7xT2W',
     documentFrontUrl: '/mock/passport_fr.jpg',
     selfieUrl: '/mock/selfie_sophie.jpg',
     status: 'PENDIENTE',
@@ -80,7 +81,7 @@ let kycDatabase: KycRecord[] = [
     countryName: 'China',
     address: 'Nanjing Rd 102, Shanghai',
     investorType: 'Foreign',
-    stellarAddress: 'GCSZ4B4V7K7Q3W2E1R9T8Y7U6I5O4P3A2S1D0F9G8H7J6K5L4Z3X2C1V',
+    walletAddress: '9pQ3mK6rT8wX2yN5bH7cV4fJ1sE9gL6uZ3aD8kB5nM2P',
     documentFrontUrl: '/mock/passport_cn.jpg',
     selfieUrl: '/mock/selfie_wei.jpg',
     status: 'PENDIENTE',
@@ -157,8 +158,8 @@ export function approveKyc(id: string, bypassHoursCheck: boolean = false): { suc
   // ledger itself starts letting them hold and trade. Fire-and-forget on
   // purpose — the officer's decision is already recorded, and a Horizon
   // hiccup is recoverable through syncHolderAuthorization.
-  void grantHolderAuthorization(record.stellarAddress).catch(() => {});
-  void whitelistLiveLicitacion(record.stellarAddress).catch(() => {});
+  if (isSolanaPublicKey(record.walletAddress)) void verifyInvestorOnChain(new PublicKey(record.walletAddress)).catch(() => {});
+
 
   return { success: true, record };
 }
@@ -196,15 +197,10 @@ export function revokeKyc(id: string, reason: string): { success: boolean; recor
   // Hard freeze: clearing the authorized flag without maintain-liabilities
   // makes the network delete this holder's open offers as well as locking the
   // balance. A revocation is a compliance action, not a grace period.
-  void revokeHolderAuthorization(record.stellarAddress, { allowUnwind: false }).catch(() => {});
+  if (isSolanaPublicKey(record.walletAddress)) void revokeInvestorOnChain(new PublicKey(record.walletAddress)).catch(() => {});
 
   return { success: true, record };
 }
 
-async function whitelistLiveLicitacion(publicKey?: string) {
-  if (!publicKey) return;
-  for (const listing of listListings()) {
-    if (!isOnChainListing(listing)) continue;
-    await verifyInvestorOnChain(listing, publicKey);
-  }
-}
+// On Solana the Investor PDA is platform-wide: a single `verify_investor`
+// covers every offering, so no per-listing whitelist step is needed.

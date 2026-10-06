@@ -23,12 +23,12 @@ export interface FiatOnRampResponse {
 export interface CctpBridgeResponse {
   success: boolean;
   originChain: 'ethereum' | 'arbitrum' | 'base' | 'solana' | 'polygon';
-  destinationChain: 'stellar';
+  destinationChain: 'solana';
   usdcAmount: number;
   bridgeFee: 0; // Cero slippage, Cero comisión
   timeSeconds: number;
   messageHash: string;
-  stellarMintTx: string;
+  solanaMintTx: string;
 }
 
 export interface NearIntentsResponse {
@@ -38,14 +38,14 @@ export interface NearIntentsResponse {
   estimatedUsdcReceiving: number;
   depositAddress: string;
   swapStatus: 'COMPLETED_MOCK';
-  stellarSettlementTx: string;
+  solanaSettlementTx: string;
 }
 
 // 1. Simulación On-Ramp ARS (Anclap / Alfred Pay)
 export function processArsOnRamp(arsAmount: number, destinationWallet: string): ArisOnRampResponse {
   const exchangeRate = 1450.0;
   const usdcAmount = Number((arsAmount / exchangeRate).toFixed(2));
-  const txHash = `mock_stellar_tx_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  const txHash = `mock_solana_tx_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
   return {
     success: true,
@@ -82,16 +82,16 @@ export function processCctpBridge(originChain: 'ethereum' | 'arbitrum' | 'base' 
   return {
     success: true,
     originChain,
-    destinationChain: 'stellar',
+    destinationChain: 'solana',
     usdcAmount,
     bridgeFee: 0,
     timeSeconds: 3,
     messageHash: `0x${Math.random().toString(16).substring(2)}${Math.random().toString(16).substring(2)}`,
-    stellarMintTx: `cctp_mint_${Date.now()}_stellar_testnet`,
+    solanaMintTx: `cctp_mint_${Date.now()}_solana_devnet`,
   };
 }
 
-// 4. Simulación NEAR Intents 1Click (BTC/ETH/SOL/USDT -> Stellar USDC)
+// 4. Simulación NEAR Intents 1Click (BTC/ETH/SOL/USDT -> Solana USDC)
 export function processNearIntentsSwap(depositAsset: 'BTC' | 'ETH' | 'SOL' | 'USDT', depositAmount: number, destinationWallet: string): NearIntentsResponse {
   let rateToUsdc = 1;
   if (depositAsset === 'BTC') rateToUsdc = 65000;
@@ -108,6 +108,6 @@ export function processNearIntentsSwap(depositAsset: 'BTC' | 'ETH' | 'SOL' | 'US
     estimatedUsdcReceiving,
     depositAddress: `intents_deposit_${depositAsset.toLowerCase()}_${Math.random().toString(36).substring(7)}`,
     swapStatus: 'COMPLETED_MOCK',
-    stellarSettlementTx: `near_intent_tx_${Date.now()}_stellar`,
+    solanaSettlementTx: `near_intent_tx_${Date.now()}_solana`,
   };
 }

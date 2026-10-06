@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { createStellarKeypair, fundFriendbot, isStellarPublicKey, loadNativeXlm } from './stellar_testnet';
+import { createWalletKeypair, isSolanaPublicKey, loadSolBalance, requestDevnetAirdrop } from './solana_devnet';
 import { getTestnetConfig } from '../admin/testnet';
 import { persistToPg } from '../data/pgstore';
 
@@ -136,6 +136,14 @@ export function custodialSigningKey(accountId: string): string {
     throw new Error('Esta cuenta es de autocustodia: firmá la orden desde tu wallet');
   }
   return openSecret(account.secretKey);
+}
+
+/** Same key as a web3.js Keypair for Solana transaction signing. */
+export function custodialSigningKeypair(accountId: string) {
+  const { Keypair } = require('@solana/web3.js') as typeof import('@solana/web3.js');
+  const bs58mod = require('bs58') as typeof import('bs58');
+  const decoded = bs58mod.default.decode(custodialSigningKey(accountId));
+  return Keypair.fromSecretKey(decoded);
 }
 
 function load() {
@@ -331,12 +339,12 @@ export function upsertWalletLogin(publicKey: string) {
 }
 
 function randomKeypair() {
-  return createStellarKeypair();
+  return createWalletKeypair();
 }
 
 function ensureAdminAccount(account: Account) {
   if (!isAdminEmail(account.email)) return;
-  if (!account.custodyMode || !isStellarPublicKey(account.publicKey)) {
+  if (!account.custodyMode || !isSolanaPublicKey(account.publicKey)) {
     const keys = randomKeypair();
     account.custodyMode = 'CUSTODIAL';
     account.publicKey = keys.publicKey;
@@ -352,7 +360,7 @@ function ensureAdminAccount(account: Account) {
 for (const existing of accounts.values()) ensureAdminAccount(existing);
 
 // Cuenta de prueba para validar el flujo de primera vez: login → custodia
-// (linkear Freighter) → KYC. Se crea sólo si no existe.
+// (vincular wallet Solana) → KYC. Se crea sólo si no existe.
 const TEST_EMAIL = 'test@fractachain.dev';
 if (![...accounts.values()].some((a) => a.email === TEST_EMAIL)) {
   const now = new Date().toISOString();
@@ -390,7 +398,7 @@ export function setCustody(accountId: string, mode: 'CUSTODIAL' | 'SELF', extern
     return { user: toPublic(account), secretOnce: undefined as string | undefined };
   }
   if (mode === 'SELF' && externalPublicKey) {
-    if (!isStellarPublicKey(externalPublicKey)) throw new Error('Public key Stellar inválida');
+    if (!isSolanaPublicKey(externalPublicKey)) throw new Error('Public key Solana inválida');
     account.custodyMode = 'SELF';
     account.publicKey = externalPublicKey;
     account.authProvider = account.authProvider || 'wallet';
@@ -418,7 +426,7 @@ export function setCustody(accountId: string, mode: 'CUSTODIAL' | 'SELF', extern
 export function linkSelfCustodyWallet(accountId: string, publicKey: string) {
   const account = accounts.get(accountId);
   if (!account) throw new Error('Cuenta no encontrada');
-  if (!isStellarPublicKey(publicKey)) throw new Error('Public key Stellar inválida');
+  if (!isSolanaPublicKey(publicKey)) throw new Error('Public key Solana inválida');
   if (account.publicKey && account.publicKey !== publicKey) {
     throw new Error('La cuenta ya tiene otra wallet vinculada');
   }
@@ -476,18 +484,14 @@ export function submitOnboardingKyc(
   // the form, so anything else would just strand the user on the pending page.
   const autoApprove =
     process.env.HACKATHON_DEMO === 'true' ||
-    getTestnetConfig().networkPassphrase.includes('Test SDF');
+    getTestnetConfig().cluster !== 'mainnet-beta';
   account.kycStatus = autoApprove ? 'APPROVED' : 'PENDING';
   account.kycId = account.kycId || `kyc-${account.id}`;
   save();
-  if (account.kycStatus === 'APPROVED' && account.publicKey) {
-    void import('../stellar/licitacion')
+  if (account.kycStatus === 'APPROVED' && account.publicKey && isSolanaPublicKey(account.publicKey)) {
+    void import('../solana/kyc')
       .then(async ({ verifyInvestorOnChain }) => {
-        const { listListings, isOnChainListing } = await import('../admin/listings');
-        for (const listing of listListings()) {
-          if (!isOnChainListing(listing)) continue;
-          await verifyInvestorOnChain(listing, account.publicKey);
-        }
+        await verifyInvestorOnChain(new (await import('@solana/web3.js')).PublicKey(account.publicKey));
       })
       .catch(() => {});
   }
@@ -683,40 +687,36 @@ export function claimPendingDividend(accountId: string, listingId: string): { am
 }
 
 export function findAccountByPublicKey(publicKey: string): Account | undefined {
-  const needle = String(publicKey || '').trim().toUpperCase();
+  const needle = String(publicKey || '').trim();
   if (!needle) return undefined;
-  return [...accounts.values()].find((a) => a.publicKey?.trim().toUpperCase() === needle);
+  return [...accounts.values()].find((a) => a.publicKey?.trim() === needle);
 }
 
 export async function hydrateTestnetWallet(accountId: string) {
   const account = accounts.get(accountId);
   if (!account) return undefined;
-  if (account.custodyMode === 'CUSTODIAL' && !isStellarPublicKey(account.publicKey)) {
+  if (account.custodyMode === 'CUSTODIAL' && !isSolanaPublicKey(account.publicKey)) {
     const keys = randomKeypair();
     account.publicKey = keys.publicKey;
     account.secretKey = sealSecret(keys.secretKey);
     account.recoveryHint = 'custodia-fractachain';
   }
-  if (!isStellarPublicKey(account.publicKey)) {
+  if (!isSolanaPublicKey(account.publicKey)) {
     save();
     return toPublic(account);
   }
-  const faucet = await fundFriendbot(account.publicKey);
-  if (faucet.funded) {
-    account.faucetFundedAt = account.faucetFundedAt || new Date().toISOString();
+  if (!account.faucetFundedAt && (await requestDevnetAirdrop(account.publicKey))) {
+    account.faucetFundedAt = new Date().toISOString();
   }
-  // Full funding check on every hydrate: XLM refill + USDC trustline/grant.
-  // Custodial is fully server-signed (user does nothing); self-custody gets
-  // XLM topped up and USDC only when the holder already opened the trustline.
+  // Custodial accounts also get demo USDC minted when a mint authority is
+  // configured (localnet/devnet mock mint only — never real USDC).
   try {
-    const { ensureWalletFunded } = await import('../stellar/usdc');
-    const walletSecret =
-      account.custodyMode === 'CUSTODIAL' && account.secretKey ? openSecret(account.secretKey) : null;
-    await ensureWalletFunded(account.publicKey, { walletSecret });
+    const { ensureWalletFunded } = await import('../solana/wallet_funding');
+    await ensureWalletFunded(account.publicKey);
   } catch (err: any) {
     console.warn('[wallet-faucet]', err?.message || err);
   }
-  account.xlmBalance = await loadNativeXlm(account.publicKey);
+  account.xlmBalance = await loadSolBalance(account.publicKey);
   save();
   return toPublic(account);
 }
