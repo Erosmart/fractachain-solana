@@ -116,6 +116,7 @@ import {
 import {
   authenticateWithFirebase,
   getFirebaseUserByToken,
+  resolveFirebaseProfile,
 } from './auth/firebase_auth';
 import { authenticateWithWallet, linkWalletSignature } from './auth/wallet_auth';
 import {
@@ -142,7 +143,12 @@ import path from 'path';
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-app.use(cors({ origin: true, credentials: true }));
+// CORS_ORIGINS=https://app.example.com,https://other.example — unset reflects any origin.
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+app.use(cors({ origin: CORS_ORIGINS.length ? CORS_ORIGINS : true, credentials: true }));
 app.use(express.json({ limit: '8mb' }));
 
 function requireAdmin(req: Request, res: Response) {
@@ -168,12 +174,18 @@ app.get('/health', (_req: Request, res: Response) => {
       ? `Solana ${process.env.SOLANA_CLUSTER || 'devnet'} (program loaded)`
       : `Solana ${process.env.SOLANA_CLUSTER || 'devnet'} (sandbox — programa sin deployar)`,
     onChain: isProgramDeployed(),
+    persistence: process.env.DATABASE_URL ? 'postgres' : 'files (se pierde en cada redeploy)',
+    googleLogin: process.env.FIREBASE_API_KEY ? 'verified' : process.env.NODE_ENV === 'production' ? 'disabled' : 'dev-unverified',
     timestamp: new Date().toISOString(),
   });
 });
 
 // --- Google Authentication Routes ---
 app.post('/api/auth/google', (req: Request, res: Response) => {
+  // Mock login that trusts the posted email — local dev only.
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(410).json({ success: false, message: 'Usá /api/auth/firebase' });
+  }
   const result = authenticateWithGoogle(req.body);
   res.json(result);
 });
@@ -257,6 +269,10 @@ app.post('/api/kyc/onboard', (req: Request, res: Response) => {
 });
 
 app.get('/api/kyc/selfie/:id', (req: Request, res: Response) => {
+  const viewer = getAccountByToken(req.headers.authorization);
+  if (!viewer || (viewer.id !== req.params.id && !isAdminAccount(viewer))) {
+    return res.status(403).json({ success: false, message: 'Solo el admin o el titular' });
+  }
   const file = readSelfie(req.params.id);
   if (!file) return res.status(404).end();
   res.sendFile(path.resolve(file));
@@ -349,9 +365,14 @@ app.post('/api/wallet/usdc/fund', async (req: Request, res: Response) => {
 
 // --- Firebase Authentication Routes ---
 app.post('/api/auth/firebase', async (req: Request, res: Response) => {
-  const result = authenticateWithFirebase(req.body);
-  res.json(result);
-  if (result.user?.id) void hydrateTestnetWallet(result.user.id).catch(() => undefined);
+  try {
+    const profile = await resolveFirebaseProfile(req.body || {});
+    const result = authenticateWithFirebase(profile);
+    res.json(result);
+    if (result.user?.id) void hydrateTestnetWallet(result.user.id).catch(() => undefined);
+  } catch (err: any) {
+    res.status(401).json({ success: false, message: err.message });
+  }
 });
 
 app.get('/api/auth/firebase/me', (req: Request, res: Response) => {

@@ -502,6 +502,7 @@ export function listedPools() {
         isin: d.isin,
         paymentKind: d.paymentKind || 'USDC',
         finalizeHash: l.finalizeHash || null,
+        onChain: isOnChainListing(l),
         validation: validationPack(l),
       };
     });

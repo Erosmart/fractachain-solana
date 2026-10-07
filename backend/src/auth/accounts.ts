@@ -84,8 +84,22 @@ const SELFIE_DIR = path.join(DATA_DIR, 'selfies');
 const accounts = new Map<string, Account>();
 const sessions = new Map<string, string>();
 
-function hashPassword(password: string) {
+/** Unsalted sha256 from the first version — only kept to verify and upgrade old rows. */
+function legacyHash(password: string) {
   return crypto.createHash('sha256').update(`fc:${password}`).digest('hex');
+}
+
+function hashPassword(password: string) {
+  const salt = crypto.randomBytes(16);
+  return `s1:${salt.toString('hex')}:${crypto.scryptSync(password, salt, 32).toString('hex')}`;
+}
+
+function checkPassword(password: string, stored: string) {
+  if (!stored.startsWith('s1:')) return stored === legacyHash(password);
+  const [, saltHex, hashHex] = stored.split(':');
+  const expected = Buffer.from(hashHex, 'hex');
+  const actual = crypto.scryptSync(password, Buffer.from(saltHex, 'hex'), expected.length);
+  return crypto.timingSafeEqual(actual, expected);
 }
 
 const AUTH_PEPPER = process.env.AUTH_PEPPER || 'fractachain-dev-auth';
@@ -261,6 +275,14 @@ export function upsertLogin(payload: {
   let account = [...accounts.values()].find((a) => a.email === email);
   const now = new Date().toISOString();
 
+  // Email+password never proves the email is yours. Admin emails must come
+  // through Google (token verified), and a Google-created account must not
+  // accept a password set by whoever tries first.
+  if (payload.password) {
+    if (isAdminEmail(email)) throw new Error('La cuenta de admin solo entra con Google');
+    if (account && !account.passwordHash) throw new Error('Esta cuenta entra con Google o con su wallet');
+  }
+
   if (!account) {
     if (payload.password && payload.password.length < 6) {
       throw new Error('La contraseña debe tener al menos 6 caracteres');
@@ -284,10 +306,11 @@ export function upsertLogin(payload: {
     accounts.set(account.id, account);
   } else {
     if (payload.password) {
-      if (!account.passwordHash) {
-        account.passwordHash = hashPassword(payload.password);
-      } else if (account.passwordHash !== hashPassword(payload.password)) {
+      if (!checkPassword(payload.password, account.passwordHash!)) {
         throw new Error('Contraseña incorrecta');
+      }
+      if (!account.passwordHash!.startsWith('s1:')) {
+        account.passwordHash = hashPassword(payload.password);
       }
     }
     account.lastLoginAt = now;

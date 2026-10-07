@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import OnboardingGuard from './OnboardingGuard';
 import AdminGate from './AdminGate';
 
-const GATED = ['/dashboard', '/stocks', '/orderbook'];
+const GATED = ['/dashboard'];
 
 export default function AppGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

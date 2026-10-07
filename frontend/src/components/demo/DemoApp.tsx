@@ -19,10 +19,10 @@ import PortfolioPanel from './PortfolioPanel';
 export type DemoTab = 'emision' | 'primario' | 'orderbook' | 'portfolio';
 
 const TAB_ROUTES: Record<DemoTab, string> = {
-  emision: '/emision',
-  primario: '/licitaciones',
-  orderbook: '/orderbook',
-  portfolio: '/portfolio',
+  emision: '/demo/emision',
+  primario: '/demo/licitaciones',
+  orderbook: '/demo/orderbook',
+  portfolio: '/demo/portfolio',
 };
 
 const TABS: { id: DemoTab; icon: ReactNode }[] = [
