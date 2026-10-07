@@ -84,8 +84,22 @@ const SELFIE_DIR = path.join(DATA_DIR, 'selfies');
 const accounts = new Map<string, Account>();
 const sessions = new Map<string, string>();
 
-function hashPassword(password: string) {
+/** Unsalted sha256 from the first version — only kept to verify and upgrade old rows. */
+function legacyHash(password: string) {
   return crypto.createHash('sha256').update(`fc:${password}`).digest('hex');
+}
+
+function hashPassword(password: string) {
+  const salt = crypto.randomBytes(16);
+  return `s1:${salt.toString('hex')}:${crypto.scryptSync(password, salt, 32).toString('hex')}`;
+}
+
+function checkPassword(password: string, stored: string) {
+  if (!stored.startsWith('s1:')) return stored === legacyHash(password);
+  const [, saltHex, hashHex] = stored.split(':');
+  const expected = Buffer.from(hashHex, 'hex');
+  const actual = crypto.scryptSync(password, Buffer.from(saltHex, 'hex'), expected.length);
+  return crypto.timingSafeEqual(actual, expected);
 }
 
 const AUTH_PEPPER = process.env.AUTH_PEPPER || 'fractachain-dev-auth';
@@ -284,10 +298,11 @@ export function upsertLogin(payload: {
     accounts.set(account.id, account);
   } else {
     if (payload.password) {
-      if (!account.passwordHash) {
-        account.passwordHash = hashPassword(payload.password);
-      } else if (account.passwordHash !== hashPassword(payload.password)) {
+      if (account.passwordHash && !checkPassword(payload.password, account.passwordHash)) {
         throw new Error('Contraseña incorrecta');
+      }
+      if (!account.passwordHash || !account.passwordHash.startsWith('s1:')) {
+        account.passwordHash = hashPassword(payload.password);
       }
     }
     account.lastLoginAt = now;

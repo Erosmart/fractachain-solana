@@ -1,4 +1,4 @@
-import DemoApp from '../../components/demo/DemoApp';
+import DemoApp from '../../../components/demo/DemoApp';
 
 export default function Page() {
   return <DemoApp tab="primario" />;

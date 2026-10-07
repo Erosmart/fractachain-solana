@@ -437,16 +437,16 @@ export function useAuth() {
 
 export function nextOnboardingPath(user: User | null) {
   if (!user) return '/login';
-  if (user.isAdmin) return '/dashboard';
   if (!user.custodyMode) return '/onboarding/wallet';
+  if (user.isAdmin) return '/dashboard';
   if (user.kycStatus === 'UNREGISTERED') return '/onboarding/kyc';
   if (user.kycStatus !== 'APPROVED') return '/onboarding/pending';
   return '/dashboard';
 }
 
 export function afterAuthPath(user: User, nextParam?: string | null) {
-  if (user.isAdmin) return nextParam || '/admin/kyc';
   const dest = nextOnboardingPath(user);
+  if (user.isAdmin && dest === '/dashboard') return nextParam || '/admin/kyc';
   if (nextParam && user.kycStatus === 'APPROVED') return nextParam;
   return dest;
 }

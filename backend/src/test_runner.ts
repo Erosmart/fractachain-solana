@@ -175,7 +175,7 @@ assert(
 
 console.log('\n[9] Probando que ninguna respuesta filtre material secreto:');
 
-const secAuth = upsertLogin({ email: 'sec-check@example.com', name: 'Sec Check' });
+const secAuth = upsertLogin({ email: `sec-check-${Date.now()}@example.com`, name: 'Sec Check' });
 assert(secAuth.success === true, 'Cuenta de prueba de secretos creada');
 
 let selfNoKey = false;
