@@ -7,6 +7,15 @@ export type SolanaCluster = 'devnet' | 'testnet' | 'localnet' | 'mainnet-beta';
 export const SOLANA_CLUSTER: SolanaCluster =
   (process.env.SOLANA_CLUSTER as SolanaCluster) || 'devnet';
 
+// The project runs on test networks only. Mainnet needs an explicit opt-in so
+// a stray SOLANA_CLUSTER or RPC URL can't point real funds at an unaudited program.
+if (
+  process.env.ALLOW_MAINNET !== 'true' &&
+  (SOLANA_CLUSTER === 'mainnet-beta' || /mainnet/i.test(process.env.SOLANA_RPC_URL || ''))
+) {
+  throw new Error('Mainnet bloqueada: este proyecto corre en devnet (ALLOW_MAINNET=true para habilitarla)');
+}
+
 export const SOLANA_RPC_URL =
   process.env.SOLANA_RPC_URL ||
   (SOLANA_CLUSTER === 'localnet'
