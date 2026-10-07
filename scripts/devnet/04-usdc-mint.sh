@@ -6,6 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 MINT=$(spl-token create-token --decimals 6 \
+  --fee-payer deploy-keys/admin.json \
   --mint-authority deploy-keys/usdc-mint-authority.json \
   --output json-compact | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).mint))")
 

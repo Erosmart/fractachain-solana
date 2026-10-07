@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-anchor deploy --provider.cluster devnet
+anchor deploy --provider.cluster devnet --provider.wallet deploy-keys/admin.json
 
 PROGRAM_ID=$(solana address -k target/deploy/fractachain-keypair.json)
 echo "programId: $PROGRAM_ID"
