@@ -1,11 +1,14 @@
 {
   "cluster": "devnet",
-  "programId": "Fractachain111111111111111111111111111111111",
-  "usdcMint": "",
+  "programId": "2d6JqnHjvAL1935Y6CXGnx2VB2Ff8L3Yi9tkApaHbJzd",
+  "usdcMint": "HpT3wXPec3JRnust7KYSEG7bYQ3WHehVqyzuMYxm5T58",
   "usdtMint": "",
   "platform": "",
   "markets": {},
-  "deployedAt": null,
-  "deployer": "",
-  "notes": "Placeholder — `anchor deploy` lo reemplaza con los valores reales. Ver SETUP_SOLANA.md."
+  "deployedAt": "2026-10-07T17:48:43.548Z",
+  "deployer": "deploy-keys/admin.json",
+  "notes": "Programa deployado en devnet (upgradeable, authority = admin). IDL no subido (--no-idl).",
+  "upgradeAuthority": "7zezSd4D6QgATXSLnemHJ45PTc4qGtCNsCqfxLi3qefK",
+  "programData": "5e7guhf2MSUXjko8JQeEtz5ysUmgZCXqdJ3CKcyEhaTv",
+  "usdcMintAuthority": "4xUCwqrFAaBYtMFwYewjGNA4Xk9ZRfuiL7Fwj7LexZpf"
 }

@@ -8,8 +8,13 @@ cd "$(dirname "$0")/../.."
 MINT=$(spl-token create-token --decimals 6 \
   --fee-payer deploy-keys/admin.json \
   --mint-authority deploy-keys/usdc-mint-authority.json \
-  --output json-compact | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).mint))")
+  --output json-compact | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(j.address||j.mint||'')})")
 
+# spl-token 5.x devuelve el mint en `address`; si no llega, no escribir basura.
+if [ -z "$MINT" ]; then
+  echo "No se pudo leer la dirección del mint de la salida de spl-token" >&2
+  exit 1
+fi
 echo "USDC devnet mint: $MINT"
 
 node - "$MINT" <<'NODE'

@@ -10,9 +10,8 @@ cd "$(dirname "$0")/../.."
 
 TOOLS_VERSION="${TOOLS_VERSION:-v1.57}"
 
-anchor build --tools-version "$TOOLS_VERSION"
 anchor keys sync    # declare_id! + Anchor.toml ← pubkey real de target/deploy/fractachain-keypair.json
-anchor build --tools-version "$TOOLS_VERSION"   # recompila con el Program ID correcto
+anchor build --tools-version "$TOOLS_VERSION"   # compila ya con el Program ID correcto
 
 echo
 echo "Program id: $(solana address -k target/deploy/fractachain-keypair.json 2>/dev/null || grep -o 'declare_id!("[^"]*")' programs/fractachain/src/lib.rs)"

@@ -10,7 +10,7 @@ pub mod utils;
 use instructions::*;
 use state::*;
 
-declare_id!("Fractachain111111111111111111111111111111111");
+declare_id!("2d6JqnHjvAL1935Y6CXGnx2VB2Ff8L3Yi9tkApaHbJzd");
 
 #[program]
 pub mod fractachain {
