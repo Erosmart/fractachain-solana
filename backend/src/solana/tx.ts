@@ -44,6 +44,26 @@ export async function buildUnsignedTx(
     .toString('base64');
 }
 
+/**
+ * Like buildUnsignedTx but some ixs need signatures the wallet can't provide
+ * (e.g. a freshly generated Manifest wrapper keypair). The backend partial-
+ * signs those; the wallet still signs as fee payer / owner.
+ */
+export async function buildPartiallySignedTx(
+  feePayer: PublicKey,
+  ixs: TransactionInstruction[],
+  serverSigners: Keypair[],
+): Promise<string> {
+  const conn = getConnection();
+  const tx = new Transaction().add(...ixs);
+  tx.feePayer = feePayer;
+  tx.recentBlockhash = (await conn.getLatestBlockhash()).blockhash;
+  if (serverSigners.length) tx.partialSign(...serverSigners);
+  return tx
+    .serialize({ requireAllSignatures: false, verifySignatures: false })
+    .toString('base64');
+}
+
 /** Relays a wallet-signed transaction. Returns the signature. */
 export async function submitSignedTx(signedTxBase64: string): Promise<string> {
   const conn = getConnection();

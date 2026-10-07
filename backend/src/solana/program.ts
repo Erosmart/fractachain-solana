@@ -264,31 +264,44 @@ export interface ContributeParams {
 
 export function ixContribute(p: ContributeParams) {
   const [offering] = offeringPda(p.listingId);
-  const [rwaMint] = rwaMintPda(offering);
   const [investor] = investorPda(p.buyer);
   const [contribution] = contributionPda(offering, p.buyer);
-  const [opa] = opaPda(offering);
   const buyerPaymentAta = ataOf(p.buyer, p.paymentMint, p.paymentTokenProgram);
-  const buyerRwaAta = ataOf(p.buyer, rwaMint, TOKEN_2022_PROGRAM_ID);
-  const treasuryAta = ataOf(offering, rwaMint, TOKEN_2022_PROGRAM_ID);
   const escrowAta = ataOf(offering, p.paymentMint, p.paymentTokenProgram);
   return ix('contribute', [
     meta(p.buyer, { mut: true, signer: true }),
-    meta(investor, { mut: true }),
+    meta(investor),
     meta(offering, { mut: true }),
     meta(buyerPaymentAta, { mut: true }),
-    meta(buyerRwaAta, { mut: true }),
-    meta(rwaMint),
     meta(p.paymentMint),
-    meta(treasuryAta, { mut: true }),
     meta(escrowAta, { mut: true }),
     meta(contribution, { mut: true }),
-    meta(opa, { mut: true }),
-    meta(TOKEN_2022_PROGRAM_ID),
     meta(p.paymentTokenProgram),
-    meta(ASSOCIATED_TOKEN_PROGRAM_ID),
     meta(SystemProgram.programId),
   ], (e) => e.u64(p.amount));
+}
+
+/** Permissionless crank: delivers `wallet`'s units after a successful close. */
+export function ixDistribute(caller: PublicKey, listingId: string, wallet: PublicKey) {
+  const [offering] = offeringPda(listingId);
+  const [rwaMint] = rwaMintPda(offering);
+  const [investor] = investorPda(wallet);
+  const [contribution] = contributionPda(offering, wallet);
+  const [opa] = opaPda(offering);
+  return ix('distribute', [
+    meta(caller, { mut: true, signer: true }),
+    meta(offering, { mut: true }),
+    meta(wallet, { mut: true }),
+    meta(investor, { mut: true }),
+    meta(contribution, { mut: true }),
+    meta(ataOf(wallet, rwaMint, TOKEN_2022_PROGRAM_ID), { mut: true }),
+    meta(rwaMint),
+    meta(ataOf(offering, rwaMint, TOKEN_2022_PROGRAM_ID), { mut: true }),
+    meta(opa, { mut: true }),
+    meta(TOKEN_2022_PROGRAM_ID),
+    meta(ASSOCIATED_TOKEN_PROGRAM_ID),
+    meta(SystemProgram.programId),
+  ]);
 }
 
 export function ixFinalize(
@@ -314,27 +327,27 @@ export function ixFinalize(
   ]);
 }
 
+/**
+ * Permissionless crank: refunds `wallet`'s escrowed payment after a failed
+ * close. `caller` pays the fee + refund ATA rent; the contributor never signs.
+ */
 export function ixRefund(
-  contributor: PublicKey,
+  caller: PublicKey,
   listingId: string,
+  wallet: PublicKey,
   paymentMint: PublicKey,
   paymentTokenProgram: PublicKey,
 ) {
   const [offering] = offeringPda(listingId);
-  const [rwaMint] = rwaMintPda(offering);
-  const [contribution] = contributionPda(offering, contributor);
+  const [contribution] = contributionPda(offering, wallet);
   return ix('refund', [
-    meta(contributor, { mut: true, signer: true }),
+    meta(caller, { mut: true, signer: true }),
     meta(offering, { mut: true }),
+    meta(wallet, { mut: true }),
     meta(contribution, { mut: true }),
-    meta(contributor),
-    meta(ataOf(contributor, rwaMint, TOKEN_2022_PROGRAM_ID), { mut: true }),
-    meta(rwaMint),
     meta(paymentMint),
-    meta(ataOf(offering, rwaMint, TOKEN_2022_PROGRAM_ID), { mut: true }),
     meta(ataOf(offering, paymentMint, paymentTokenProgram), { mut: true }),
-    meta(ataOf(contributor, paymentMint, paymentTokenProgram), { mut: true }),
-    meta(TOKEN_2022_PROGRAM_ID),
+    meta(ataOf(wallet, paymentMint, paymentTokenProgram), { mut: true }),
     meta(paymentTokenProgram),
     meta(ASSOCIATED_TOKEN_PROGRAM_ID),
     meta(SystemProgram.programId),

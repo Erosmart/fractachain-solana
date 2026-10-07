@@ -8,6 +8,8 @@ import {
   LayoutDashboard,
   FlaskConical,
   ShieldCheck,
+  BookOpen,
+  FilePlus2,
   LogIn,
   LogOut,
   Menu,
@@ -27,8 +29,14 @@ export default function Navbar() {
 
   const allLinks = [
     { href: '/mercado', label: t('acct.navMarket'), icon: Layers },
+    { href: '/orderbook', label: t('nav.orderbook'), icon: BookOpen },
     ...(user ? [{ href: '/dashboard', label: t('acct.navAccount'), icon: LayoutDashboard }] : []),
-    ...(user?.isAdmin ? [{ href: '/admin/kyc', label: t('acct.navAdmin'), icon: ShieldCheck }] : []),
+    ...(user?.isAdmin
+      ? [
+          { href: '/admin/emision', label: t('nav.issuance'), icon: FilePlus2 },
+          { href: '/admin/kyc', label: t('acct.navAdmin'), icon: ShieldCheck },
+        ]
+      : []),
     { href: '/demo', label: t('acct.navDemo'), icon: FlaskConical },
   ];
 

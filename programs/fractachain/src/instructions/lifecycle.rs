@@ -1,6 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use anchor_spl::token_2022::spl_token_2022;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface};
 
 use crate::errors::FractachainError;
@@ -16,7 +14,6 @@ pub struct Contribute<'info> {
     #[account(mut)]
     pub buyer: Signer<'info>,
     #[account(
-        mut,
         seeds = [INVESTOR_SEED, buyer.key().as_ref()],
         bump = investor.bump,
     )]
@@ -34,21 +31,8 @@ pub struct Contribute<'info> {
         constraint = buyer_payment_ata.mint == offering.payment_mint,
     )]
     pub buyer_payment_ata: Box<InterfaceAccount<'info, TokenAccount>>,
-    /// Buyer's RWA ATA — created frozen, then thawed (KYC'd holder).
-    #[account(
-        init_if_needed,
-        payer = buyer,
-        associated_token::mint = rwa_mint,
-        associated_token::authority = buyer,
-        associated_token::token_program = token_2022_program,
-    )]
-    pub buyer_rwa_ata: Box<InterfaceAccount<'info, TokenAccount>>,
-    #[account(address = offering.rwa_mint)]
-    pub rwa_mint: Box<InterfaceAccount<'info, Mint>>,
     #[account(address = offering.payment_mint)]
     pub payment_mint: Box<InterfaceAccount<'info, Mint>>,
-    #[account(mut, address = offering.treasury_ata)]
-    pub treasury_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(mut, address = offering.escrow_ata)]
     pub escrow_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
@@ -59,15 +43,14 @@ pub struct Contribute<'info> {
         bump,
     )]
     pub contribution: Box<Account<'info, Contribution>>,
-    /// CHECK: Opa PDA, created manually if the 50% threshold trips.
-    #[account(mut)]
-    pub opa: UncheckedAccount<'info>,
-    pub token_2022_program: Program<'info, anchor_spl::token_2022::Token2022>,
     pub payment_token_program: Interface<'info, TokenInterface>,
-    pub associated_token_program: Program<'info, anchor_spl::associated_token::AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
+/// Subscription = escrow only. Units stay in the treasury float until a
+/// successful close — `distribute` delivers them, `refund` returns escrow on
+/// failure. The buyer's RWA ATA and the Art. 87 check therefore moved to
+/// `distribute`.
 pub fn contribute(ctx: Context<Contribute>, payment_amount: u64) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     require!(
@@ -106,30 +89,6 @@ pub fn contribute(ctx: Context<Contribute>, payment_amount: u64) -> Result<()> {
         ctx.accounts.payment_mint.decimals,
     )?;
 
-    // Thaw the buyer's RWA ATA if the mint froze it (fresh ATA or KYC-revoked
-    // holder whose Investor record is now live again).
-    if ctx.accounts.buyer_rwa_ata.is_frozen() {
-        thaw(
-            &ctx.accounts.buyer_rwa_ata.to_account_info(),
-            &ctx.accounts.rwa_mint.to_account_info(),
-            &offering.to_account_info(),
-            &offering_signer(offering),
-            &ctx.accounts.token_2022_program.to_account_info(),
-        )?;
-    }
-
-    // Deliver the units out of the custodied float.
-    transfer_checked_signed(
-        &ctx.accounts.treasury_ata.to_account_info(),
-        &ctx.accounts.buyer_rwa_ata.to_account_info(),
-        &ctx.accounts.rwa_mint.to_account_info(),
-        &offering.to_account_info(),
-        &offering_signer(offering),
-        &ctx.accounts.token_2022_program.to_account_info(),
-        units,
-        0,
-    )?;
-
     offering.total_raised = total_raised;
     offering.units_sold = offering
         .units_sold
@@ -149,22 +108,6 @@ pub fn contribute(ctx: Context<Contribute>, payment_amount: u64) -> Result<()> {
         amount: payment_amount,
         units,
     });
-
-    // Art. 87/88: crossing 50% anywhere — primary or secondary — must trip the
-    // OPA bookkeeping, not just secondary fills.
-    ctx.accounts.buyer_rwa_ata.reload()?;
-    let buyer_balance = ctx.accounts.buyer_rwa_ata.amount;
-    apply_control_threshold(
-        &ctx.accounts.opa.to_account_info(),
-        &ctx.accounts.buyer.to_account_info(),
-        &mut *ctx.accounts.investor,
-        offering.key(),
-        offering,
-        buyer_balance,
-        now,
-        &ctx.accounts.system_program.to_account_info(),
-        &ctx.program_id,
-    )?;
     Ok(())
 }
 
@@ -187,8 +130,6 @@ pub fn apply_control_threshold<'info>(
         Pubkey::find_program_address(&[OPA_SEED, offering_key.as_ref()], program_id);
     require_keys_eq!(opa_pda, opa_info.key(), FractachainError::InvalidAddress);
 
-    let disc = Opa::DISCRIMINATOR;
-
     // Load the existing record only if the PDA is already initialized.
     let existing: Option<Opa> = if opa_info.data_is_empty() {
         None
@@ -198,10 +139,10 @@ pub fn apply_control_threshold<'info>(
         Some(Opa::try_deserialize(&mut body)?)
     };
 
+    // `#[account]` serialization already writes the 8-byte discriminator.
     let write_record = |opa_info: &AccountInfo<'info>, rec: &Opa| -> Result<()> {
         let mut data = opa_info.try_borrow_mut_data()?;
-        data[..disc.len()].copy_from_slice(disc);
-        let mut writer: &mut [u8] = &mut data[disc.len()..];
+        let mut writer: &mut [u8] = &mut data[..];
         rec.try_serialize(&mut writer)?;
         Ok(())
     };
@@ -330,74 +271,87 @@ pub fn finalize(ctx: Context<Finalize>) -> Result<()> {
     Ok(())
 }
 
-/* ----------------------------------------------------------------- refund */
+/* -------------------------------------------------------------- distribute */
 
 #[derive(Accounts)]
-pub struct Refund<'info> {
+pub struct Distribute<'info> {
+    /// Permissionless crank — pays for the holder's ATA if it does not exist.
     #[account(mut)]
-    pub contributor: Signer<'info>,
+    pub caller: Signer<'info>,
     #[account(
         mut,
         seeds = [OFFERING_SEED, offering.listing_seed.as_ref()],
         bump = offering.bump,
-        constraint = offering.state == OfferingState::Failed @ FractachainError::NotFailed,
+        constraint = offering.state == OfferingState::Successful
+            @ FractachainError::NotOpen,
     )]
     pub offering: Box<Account<'info, Offering>>,
+    /// CHECK: holder wallet — must own the contribution below.
+    #[account(mut)]
+    pub wallet: UncheckedAccount<'info>,
     #[account(
         mut,
-        close = contributor,
-        seeds = [CONTRIBUTION_SEED, offering.key().as_ref(), contributor.key().as_ref()],
+        seeds = [INVESTOR_SEED, wallet.key().as_ref()],
+        bump = investor.bump,
+    )]
+    pub investor: Box<Account<'info, Investor>>,
+    #[account(
+        mut,
+        seeds = [CONTRIBUTION_SEED, offering.key().as_ref(), wallet.key().as_ref()],
         bump = contribution.bump,
         has_one = wallet @ FractachainError::NotContributionOwner,
     )]
     pub contribution: Box<Account<'info, Contribution>>,
-    /// CHECK: alias of contributor for the has_one above.
-    #[account(address = contributor.key())]
-    pub wallet: UncheckedAccount<'info>,
-    /// Contributor's RWA ATA — may be frozen; the permanent delegate moves it.
-    #[account(
-        mut,
-        token::authority = contributor,
-        address = get_associated_token_address_with_program_id(
-            &contributor.key(), &rwa_mint.key(), &spl_token_2022::ID,
-        ),
-    )]
-    pub contributor_rwa_ata: Box<InterfaceAccount<'info, TokenAccount>>,
-    #[account(address = offering.rwa_mint)]
-    pub rwa_mint: Box<InterfaceAccount<'info, Mint>>,
-    #[account(address = offering.payment_mint)]
-    pub payment_mint: Box<InterfaceAccount<'info, Mint>>,
-    #[account(mut, address = offering.treasury_ata)]
-    pub treasury_ata: Box<InterfaceAccount<'info, TokenAccount>>,
-    #[account(mut, address = offering.escrow_ata)]
-    pub escrow_ata: Box<InterfaceAccount<'info, TokenAccount>>,
+    /// Holder's RWA ATA — created frozen, thawed on delivery (KYC'd holder).
     #[account(
         init_if_needed,
-        payer = contributor,
-        associated_token::mint = payment_mint,
-        associated_token::authority = contributor,
-        associated_token::token_program = payment_token_program,
+        payer = caller,
+        associated_token::mint = rwa_mint,
+        associated_token::authority = wallet,
+        associated_token::token_program = token_2022_program,
     )]
-    pub contributor_payment_ata: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub wallet_rwa_ata: Box<InterfaceAccount<'info, TokenAccount>>,
+    #[account(address = offering.rwa_mint)]
+    pub rwa_mint: Box<InterfaceAccount<'info, Mint>>,
+    #[account(mut, address = offering.treasury_ata)]
+    pub treasury_ata: Box<InterfaceAccount<'info, TokenAccount>>,
+    /// CHECK: Opa PDA, created manually if the 50% threshold trips.
+    #[account(mut)]
+    pub opa: UncheckedAccount<'info>,
     pub token_2022_program: Program<'info, anchor_spl::token_2022::Token2022>,
-    pub payment_token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, anchor_spl::associated_token::AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
-pub fn refund(ctx: Context<Refund>) -> Result<()> {
+/// Delivers one contributor's units after a successful close. Anyone can
+/// call it — the settlement sweeper iterates all Contribution PDAs. A holder
+/// whose KYC lapsed between contribute and close receives the units but the
+/// ATA stays frozen (delivered ≠ tradable); refund only exists on failure.
+/// Idempotent: sets `units`/`amount` to zero so a second call is a no-op.
+pub fn distribute(ctx: Context<Distribute>) -> Result<()> {
+    let now = Clock::get()?.unix_timestamp;
     let offering = &mut ctx.accounts.offering;
     let units = ctx.accounts.contribution.units;
-    require!(units > 0, FractachainError::NothingToRefund);
-    let amount = ctx.accounts.contribution.amount;
+    require!(units > 0, FractachainError::NothingToDistribute);
 
     let seeds: &[&[u8]] = &offering_signer(offering);
 
-    // Units return to the custodied float — permanent delegate moves them even
-    // if the contributor's ATA is frozen (KYC revoked holders still exit).
+    // Thaw long enough to land the units, then re-freeze only if the holder
+    // is no longer KYC-verified — a revoked holder owns their units but can't
+    // move them.
+    let verified = is_investor_verified(&ctx.accounts.investor, now);
+    if ctx.accounts.wallet_rwa_ata.is_frozen() {
+        thaw(
+            &ctx.accounts.wallet_rwa_ata.to_account_info(),
+            &ctx.accounts.rwa_mint.to_account_info(),
+            &offering.to_account_info(),
+            seeds,
+            &ctx.accounts.token_2022_program.to_account_info(),
+        )?;
+    }
     transfer_checked_signed(
-        &ctx.accounts.contributor_rwa_ata.to_account_info(),
         &ctx.accounts.treasury_ata.to_account_info(),
+        &ctx.accounts.wallet_rwa_ata.to_account_info(),
         &ctx.accounts.rwa_mint.to_account_info(),
         &offering.to_account_info(),
         seeds,
@@ -405,14 +359,103 @@ pub fn refund(ctx: Context<Refund>) -> Result<()> {
         units,
         0,
     )?;
+    if !verified {
+        freeze(
+            &ctx.accounts.wallet_rwa_ata.to_account_info(),
+            &ctx.accounts.rwa_mint.to_account_info(),
+            &offering.to_account_info(),
+            seeds,
+            &ctx.accounts.token_2022_program.to_account_info(),
+        )?;
+    }
 
-    // Escrow pays back the contribution.
+    let contribution = &mut ctx.accounts.contribution;
+    contribution.units = 0;
+    contribution.amount = 0;
+
+    emit!(UnitsDelivered {
+        offering: offering.key(),
+        contributor: ctx.accounts.wallet.key(),
+        units,
+    });
+
+    // Art. 87/88: a >50% delivery trips the OPA bookkeeping, same as a
+    // secondary-market fill would.
+    ctx.accounts.wallet_rwa_ata.reload()?;
+    let balance = ctx.accounts.wallet_rwa_ata.amount;
+    apply_control_threshold(
+        &ctx.accounts.opa.to_account_info(),
+        &ctx.accounts.caller.to_account_info(),
+        &mut *ctx.accounts.investor,
+        offering.key(),
+        offering,
+        balance,
+        now,
+        &ctx.accounts.system_program.to_account_info(),
+        &ctx.program_id,
+    )?;
+    Ok(())
+}
+
+/* ----------------------------------------------------------------- refund */
+
+#[derive(Accounts)]
+pub struct Refund<'info> {
+    /// Permissionless crank — pays for the contributor's payment ATA if it
+    /// does not exist. The contributor does not need to sign.
+    #[account(mut)]
+    pub caller: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [OFFERING_SEED, offering.listing_seed.as_ref()],
+        bump = offering.bump,
+        constraint = offering.state == OfferingState::Failed @ FractachainError::NotFailed,
+    )]
+    pub offering: Box<Account<'info, Offering>>,
+    /// CHECK: contribution owner — refund destination, gets the PDA rent back.
+    #[account(mut)]
+    pub wallet: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        close = wallet,
+        seeds = [CONTRIBUTION_SEED, offering.key().as_ref(), wallet.key().as_ref()],
+        bump = contribution.bump,
+        has_one = wallet @ FractachainError::NotContributionOwner,
+    )]
+    pub contribution: Box<Account<'info, Contribution>>,
+    #[account(address = offering.payment_mint)]
+    pub payment_mint: Box<InterfaceAccount<'info, Mint>>,
+    #[account(mut, address = offering.escrow_ata)]
+    pub escrow_ata: Box<InterfaceAccount<'info, TokenAccount>>,
+    #[account(
+        init_if_needed,
+        payer = caller,
+        associated_token::mint = payment_mint,
+        associated_token::authority = wallet,
+        associated_token::token_program = payment_token_program,
+    )]
+    pub contributor_payment_ata: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub payment_token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, anchor_spl::associated_token::AssociatedToken>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Refunds one contribution after a failed close. Permissionless — the
+/// sweeper iterates Contribution PDAs so nobody has to claim manually.
+/// Units never left the treasury float, so there's nothing to claw back.
+pub fn refund(ctx: Context<Refund>) -> Result<()> {
+    let offering = &mut ctx.accounts.offering;
+    let contribution = &mut ctx.accounts.contribution;
+    let amount = contribution.amount;
+    let units = contribution.units;
+    require!(amount > 0, FractachainError::NothingToRefund);
+
     pay_from_escrow(
         &ctx.accounts.escrow_ata.to_account_info(),
         &ctx.accounts.contributor_payment_ata.to_account_info(),
         &ctx.accounts.payment_mint.to_account_info(),
         &offering.to_account_info(),
-        seeds,
+        &offering_signer(offering),
         &ctx.accounts.payment_token_program.to_account_info(),
         amount,
         ctx.accounts.payment_mint.decimals,
@@ -422,10 +465,14 @@ pub fn refund(ctx: Context<Refund>) -> Result<()> {
         .units_sold
         .checked_sub(units)
         .ok_or(FractachainError::Overflow)?;
+    // The `close` attribute zeroes the account on exit — belt & suspenders
+    // for re-entrancy inside this ix.
+    contribution.amount = 0;
+    contribution.units = 0;
 
     emit!(Refunded {
         offering: offering.key(),
-        contributor: ctx.accounts.contributor.key(),
+        contributor: ctx.accounts.wallet.key(),
         amount,
         units,
     });

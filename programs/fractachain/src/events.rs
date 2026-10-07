@@ -81,6 +81,13 @@ pub struct Finalized {
 }
 
 #[event]
+pub struct UnitsDelivered {
+    pub offering: Pubkey,
+    pub contributor: Pubkey,
+    pub units: u64,
+}
+
+#[event]
 pub struct Refunded {
     pub offering: Pubkey,
     pub contributor: Pubkey,

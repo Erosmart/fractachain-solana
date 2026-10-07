@@ -1,8 +1,7 @@
-import { PublicKey, TransactionInstruction } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { Keypair, PublicKey, TransactionInstruction } from '@solana/web3.js';
 import { getConnection } from './connection';
 import { adminKeypair } from './keys';
-import { ixAuthorizeMarketVault, TOKEN_2022_PROGRAM_ID } from './program';
+import { ixAuthorizeMarketVault } from './program';
 import { sendIxs } from './tx';
 
 /**
@@ -10,8 +9,9 @@ import { sendIxs } from './tx';
  * (sdex.ts / sdex_book.ts).
  *
  * The SDK (`@cks-systems/manifest-sdk`) is loaded lazily so the backend
- * compiles and the sandbox book keeps working before `npm i` of the SDK —
- * SETUP_SOLANA.md covers installing it.
+ * compiles and the sandbox book keeps working if the dependency is missing.
+ * Real flow per trader: getSetupIxs (create wrapper + claim seat) →
+ * placeOrderWithRequiredDepositIxs (deposit + order in one tx) → cancelOrderIx.
  */
 
 export const MANIFEST_PROGRAM_ID = new PublicKey(
@@ -22,7 +22,7 @@ let sdkPromise: Promise<any> | null = null;
 
 function sdk() {
   if (!sdkPromise) {
-    sdkPromise = import('@cks-systems/manifest-sdk').catch((err) => {
+    sdkPromise = import('@cks-systems/manifest-sdk').catch(() => {
       throw new Error(
         'Manifest SDK no instalado: npm i @cks-systems/manifest-sdk (ver SETUP_SOLANA.md)',
       );
@@ -33,34 +33,31 @@ function sdk() {
 
 export interface ManifestMarketInfo {
   market: string;
+  baseVault: string;
+  quoteVault: string;
   baseMint: string;
   quoteMint: string;
 }
 
-/** Creates a Manifest market for (rwaMint, paymentMint) — server-signed. */
+/**
+ * Creates a Manifest market for (rwaMint, paymentMint) — server-signed.
+ * `Market.setupIxs` returns a fresh keypair whose pubkey IS the market
+ * account (Manifest markets are ordinary accounts, not PDAs).
+ */
 export async function createMarket(
   baseMint: PublicKey,
   quoteMint: PublicKey,
 ): Promise<ManifestMarketInfo> {
-  const { ManifestClient } = await sdk();
+  const { Market, getVaultAddress } = await sdk();
   const conn = getConnection();
   const admin = adminKeypair();
-  const client = await ManifestClient.getClientForMarketNoPrivateKey(
-    conn,
-    admin.publicKey,
-  );
-  const ixs: TransactionInstruction[] = await client.createMarketWithOptsIx({
-    baseMint,
-    quoteMint,
-    baseTokenProgram: TOKEN_2022_PROGRAM_ID,
-    quoteTokenProgram: TOKEN_PROGRAM_ID,
-  });
-  const sig = await sendIxs(admin, [], ixs);
-  // The market address is derivable from the ix accounts — SDK exposes it
-  // via getMarketForMints; keep the signature as the audit trail.
-  const market = await getMarketForMints(baseMint, quoteMint).catch(() => null);
+  const { ixs, signers } = await Market.setupIxs(conn, baseMint, quoteMint, admin.publicKey);
+  const market: PublicKey = signers[0].publicKey;
+  await sendIxs(admin, signers, ixs as TransactionInstruction[]);
   return {
-    market: market || '',
+    market: market.toBase58(),
+    baseVault: getVaultAddress(market, baseMint).toBase58(),
+    quoteVault: getVaultAddress(market, quoteMint).toBase58(),
     baseMint: baseMint.toBase58(),
     quoteMint: quoteMint.toBase58(),
   };
@@ -77,14 +74,10 @@ export async function authorizeVault(
   ]);
 }
 
-export async function getMarketForMints(
-  baseMint: PublicKey,
-  quoteMint: PublicKey,
-): Promise<string | null> {
-  const { ManifestClient } = await sdk();
-  const conn = getConnection();
-  const addr = await ManifestClient.getMarketForMints(conn, baseMint, quoteMint);
-  return addr?.toBase58?.() || null;
+/** Vault PDA for (market, mint) — the base vault is what authorizeVault thaws. */
+export async function vaultAddress(market: PublicKey, mint: PublicKey): Promise<PublicKey> {
+  const { getVaultAddress } = await sdk();
+  return getVaultAddress(market, mint);
 }
 
 export interface OrderLevel {
@@ -102,7 +95,7 @@ export interface ManifestBook {
   spread: number | null;
 }
 
-export async function getBook(marketAddress: string): Promise<ManifestBook> {
+async function loadMarket(marketAddress: string) {
   const { Market } = await sdk();
   const conn = getConnection();
   const market = await Market.loadFromAddress({
@@ -110,14 +103,17 @@ export async function getBook(marketAddress: string): Promise<ManifestBook> {
     address: new PublicKey(marketAddress),
   });
   await market.reload();
-  const bids: OrderLevel[] = market.bids().map((o: any) => ({
-    price: Number(o.tokenPrice?.toString?.() ?? o.price),
-    quantity: Number(o.numBaseTokens?.toString?.() ?? o.size),
-  }));
-  const asks: OrderLevel[] = market.asks().map((o: any) => ({
-    price: Number(o.tokenPrice?.toString?.() ?? o.price),
-    quantity: Number(o.numBaseTokens?.toString?.() ?? o.size),
-  }));
+  return market;
+}
+
+export async function getBook(marketAddress: string): Promise<ManifestBook> {
+  const market = await loadMarket(marketAddress);
+  const toLevel = (o: any): OrderLevel => ({
+    price: Number(o.tokenPrice),
+    quantity: Number(o.numBaseTokens),
+  });
+  const bids = market.bids().map(toLevel);
+  const asks = market.asks().map(toLevel);
   const bestBid = bids[0]?.price ?? null;
   const bestAsk = asks[0]?.price ?? null;
   return {
@@ -131,50 +127,63 @@ export async function getBook(marketAddress: string): Promise<ManifestBook> {
   };
 }
 
-/** Wallet-side instructions for placing an order (self-custody flow). */
+export interface TraderSetup {
+  setupNeeded: boolean;
+  instructions: TransactionInstruction[];
+  /** Fresh keypair that owns the new wrapper account — must co-sign. */
+  wrapperKeypair: Keypair | null;
+}
+
+/**
+ * First-contact setup for a trader on a market: creates their Manifest
+ * wrapper account and claims a seat. `setupNeeded=false` → ready to trade.
+ */
+export async function traderSetup(
+  marketAddress: string,
+  trader: PublicKey,
+): Promise<TraderSetup> {
+  const { ManifestClient } = await sdk();
+  const conn = getConnection();
+  const data = await ManifestClient.getSetupIxs(conn, new PublicKey(marketAddress), trader);
+  return {
+    setupNeeded: Boolean(data.setupNeeded),
+    instructions: (data.instructions || []) as TransactionInstruction[],
+    wrapperKeypair: data.wrapperKeypair || null,
+  };
+}
+
+async function clientFor(marketAddress: string, trader: PublicKey) {
+  const { ManifestClient } = await sdk();
+  const conn = getConnection();
+  return ManifestClient.getClientForMarketNoPrivateKey(
+    conn,
+    new PublicKey(marketAddress),
+    trader,
+  );
+}
+
+/**
+ * Deposit + place in one shot — the SDK only deposits whatever the
+ * withdrawable balance doesn't already cover. `traderSetup` must have run.
+ */
 export async function placeOrderIxs(params: {
   market: string;
   trader: PublicKey;
   side: 'buy' | 'sell';
   numBaseTokens: number;
   price: number;
-  isMaker?: boolean;
+  clientOrderId?: bigint;
 }): Promise<TransactionInstruction[]> {
-  const { ManifestClient } = await sdk();
-  const conn = getConnection();
-  const client = await ManifestClient.getClientForMarketNoPrivateKey(
-    conn,
-    params.trader,
-  );
-  const ixs: TransactionInstruction[] = [];
-  if (params.side === 'buy') {
-    ixs.push(
-      ...(await client.placeOrderIx(
-        new PublicKey(params.market),
-        {
-          numBaseTokens: params.numBaseTokens,
-          tokenPrice: params.price,
-          isBid: true,
-          lastValidSlot: 0,
-          orderType: 0, // Limit
-        } as any,
-      )),
-    );
-  } else {
-    ixs.push(
-      ...(await client.placeOrderIx(
-        new PublicKey(params.market),
-        {
-          numBaseTokens: params.numBaseTokens,
-          tokenPrice: params.price,
-          isBid: false,
-          lastValidSlot: 0,
-          orderType: 0,
-        } as any,
-      )),
-    );
-  }
-  return ixs;
+  const { OrderType } = await sdk();
+  const client = await clientFor(params.market, params.trader);
+  return client.placeOrderWithRequiredDepositIxs(params.trader, {
+    numBaseTokens: params.numBaseTokens,
+    tokenPrice: params.price,
+    isBid: params.side === 'buy',
+    lastValidSlot: 0, // no expiration
+    orderType: OrderType?.Limit ?? 0,
+    clientOrderId: params.clientOrderId ?? BigInt(Date.now()),
+  }) as Promise<TransactionInstruction[]>;
 }
 
 export async function cancelOrderIxs(params: {
@@ -182,34 +191,43 @@ export async function cancelOrderIxs(params: {
   trader: PublicKey;
   clientOrderId: bigint;
 }): Promise<TransactionInstruction[]> {
-  const { ManifestClient } = await sdk();
-  const conn = getConnection();
-  const client = await ManifestClient.getClientForMarketNoPrivateKey(
-    conn,
-    params.trader,
-  );
-  return client.cancelOrderIx(
-    new PublicKey(params.market),
-    { clientOrderId: params.clientOrderId } as any,
-  ) as unknown as TransactionInstruction[];
+  const client = await clientFor(params.market, params.trader);
+  return [client.cancelOrderIx({ clientOrderId: params.clientOrderId })];
 }
 
-/** All resting orders of one trader on one market. */
-export async function traderOrders(marketAddress: string, trader: PublicKey) {
-  const { Market } = await sdk();
+export interface TraderOrder {
+  clientOrderId: string;
+  side: 'buy' | 'sell';
+  price: number;
+  quantity: number;
+}
+
+/** All resting orders of one trader on one market (for "mis órdenes" + cancel). */
+export async function traderOrders(
+  marketAddress: string,
+  trader: PublicKey,
+): Promise<TraderOrder[]> {
+  const { ManifestClient, Wrapper, Market } = await sdk();
   const conn = getConnection();
+  // fetchFirstUserWrapper is `private` in the .d.ts but is the same lookup
+  // getSetupIxs uses internally — a getProgramAccounts scan on the wrapper
+  // program filtered by owner.
+  const userWrapper = await (ManifestClient as any).fetchFirstUserWrapper(conn, trader);
+  if (!userWrapper) return [];
+  const wrapper = await Wrapper.loadFromAddress({
+    connection: conn,
+    address: userWrapper.pubkey,
+  });
+  const orders = wrapper.openOrdersForMarket(new PublicKey(marketAddress)) || [];
   const market = await Market.loadFromAddress({
     connection: conn,
     address: new PublicKey(marketAddress),
   });
-  await market.reload();
-  const bids: OrderLevel[] = market
-    .bids()
-    .filter((o: any) => o.trader?.equals?.(trader))
-    .map((o: any) => ({ price: Number(o.tokenPrice), quantity: Number(o.numBaseTokens) }));
-  const asks: OrderLevel[] = market
-    .asks()
-    .filter((o: any) => o.trader?.equals?.(trader))
-    .map((o: any) => ({ price: Number(o.tokenPrice), quantity: Number(o.numBaseTokens) }));
-  return { bids, asks };
+  const baseDecimals = market.baseDecimals();
+  return orders.map((o: any) => ({
+    clientOrderId: String(o.clientOrderId),
+    side: o.isBid ? ('buy' as const) : ('sell' as const),
+    price: Number(o.price),
+    quantity: Number(o.numBaseAtoms) / 10 ** baseDecimals,
+  }));
 }

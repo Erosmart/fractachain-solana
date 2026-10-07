@@ -37,3 +37,7 @@ links.md
 deploy-keys/
 target/
 test-ledger/
+
+# Local validator/test scratch
+.localnet-ledger/
+.tmp_orig/

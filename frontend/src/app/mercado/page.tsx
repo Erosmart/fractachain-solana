@@ -76,11 +76,11 @@ function PoolCard({ pool, onDone }: { pool: Pool; onDone: () => void }) {
   return (
     <div className="rounded-2xl border border-brand-border bg-brand-card p-5 shadow-sm flex flex-col">
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <Link href={`/mercado/${pool.id}`} className="hover:underline underline-offset-2">
           <p className="font-display font-bold text-lg">{pool.tokenTicker}</p>
           <p className="text-xs text-black/60">{pool.producerName}</p>
           <p className="text-xs text-black/40">{pool.location}</p>
-        </div>
+        </Link>
         <span
           className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
             pool.onChain ? 'bg-purple-100 text-purple-800' : 'bg-black/[0.06] text-black/60'
