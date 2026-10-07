@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Copy, ExternalLink, KeyRound, ShieldCheck } from 'lucide-react';
+import SoftKycNotice from '../../components/SoftKycNotice';
 import { useAuth } from '../../context/AuthContext';
 import { useI18n } from '../../context/I18nContext';
 import { API_BASE_URL, bearerHeaders } from '../../lib/api';
@@ -60,6 +61,8 @@ export default function DashboardPage() {
   return (
     <div className="py-6">
       <h1 className="font-serif italic text-3xl sm:text-4xl">{t('dash.hello', { name: user.name || user.email })}</h1>
+
+      <SoftKycNotice className="mt-3" />
 
       {onChain !== null && (
         <p

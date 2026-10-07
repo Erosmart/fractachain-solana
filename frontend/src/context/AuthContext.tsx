@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { API_BASE_URL } from '../lib/api';
+import { isKycRequired } from '../lib/devnetMode';
 import { signAndRelay } from '../lib/selfCustody';
 import { tClient } from '../lib/i18n';
 import { ensureUsdcReady } from '../lib/usdc';
@@ -439,14 +440,20 @@ export function nextOnboardingPath(user: User | null) {
   if (!user) return '/login';
   if (!user.custodyMode) return '/onboarding/wallet';
   if (user.isAdmin) return '/dashboard';
-  if (user.kycStatus === 'UNREGISTERED') return '/onboarding/kyc';
-  if (user.kycStatus !== 'APPROVED') return '/onboarding/pending';
+  // Devnet: wallet is enough — KYC is optional (soft notice in the UI).
+  // Mainnet: keep the hard gate until APPROVED.
+  if (isKycRequired()) {
+    if (user.kycStatus === 'UNREGISTERED') return '/onboarding/kyc';
+    if (user.kycStatus !== 'APPROVED') return '/onboarding/pending';
+  }
   return '/dashboard';
 }
 
 export function afterAuthPath(user: User, nextParam?: string | null) {
   const dest = nextOnboardingPath(user);
   if (user.isAdmin && dest === '/dashboard') return nextParam || '/admin/kyc';
-  if (nextParam && user.kycStatus === 'APPROVED') return nextParam;
+  const canEnter =
+    Boolean(user.custodyMode) && (!isKycRequired() || user.kycStatus === 'APPROVED');
+  if (nextParam && canEnter) return nextParam;
   return dest;
 }

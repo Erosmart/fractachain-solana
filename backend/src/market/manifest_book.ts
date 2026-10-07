@@ -25,7 +25,7 @@ import {
   markTokensOnChain,
 } from '../auth/accounts';
 import { adminKeypair, isSolanaPublicKey } from '../solana/keys';
-import { getConnection } from '../solana/connection';
+import { getConnection, isKycEnforced } from '../solana/connection';
 import { offeringPda, rwaMintPda } from '../solana/pda';
 import { usdcBalance, usdcMint } from '../solana/usdc';
 import {
@@ -36,7 +36,7 @@ import {
   traderSetup,
 } from '../solana/manifest';
 import { buildPartiallySignedTx, buildUnsignedTx, sendIxs, submitSignedTx } from '../solana/tx';
-import { isInvestorVerifiedOnChain } from '../solana/kyc';
+import { ensureInvestorVerifiedForOps, isInvestorVerifiedOnChain } from '../solana/kyc';
 import { distributeOnChain } from '../solana/offering';
 import { fetchContribution } from '../solana/offering_state';
 import { loadTokenBalance } from '../auth/solana_devnet';
@@ -188,7 +188,7 @@ function requireTradingAccount(params: { listingId: string; accountId: string })
   if (!account?.publicKey || !isSolanaPublicKey(account.publicKey)) {
     throw new Error('La cuenta no tiene wallet Solana asociada');
   }
-  if (account.kycStatus !== 'APPROVED') {
+  if (isKycEnforced() && account.kycStatus !== 'APPROVED') {
     throw new Error('Solo inversores con KYC aprobado pueden operar');
   }
   return { listing, account, wallet: new PublicKey(account.publicKey) };
@@ -396,10 +396,14 @@ export async function openCustodialTrustline(params: { listingId: string; accoun
   const listing = requireMarketListing(params.listingId);
   const account = getAccount(params.accountId);
   if (!account?.publicKey) throw new Error('La cuenta no tiene wallet Solana asociada');
-  if (account.kycStatus !== 'APPROVED') {
+  if (isKycEnforced() && account.kycStatus !== 'APPROVED') {
     throw new Error('Solo inversores con KYC aprobado pueden aprobar el token');
   }
   const wallet = new PublicKey(account.publicKey);
+  // Devnet: seed Investor PDA so later thaw/contribute paths do not fail KYC.
+  await ensureInvestorVerifiedForOps(wallet).catch((e) =>
+    console.warn('[kyc-auto]', e?.message || e),
+  );
   const base = listingAsset(listing);
   const ata = getAssociatedTokenAddressSync(base, wallet, true, TOKEN_2022_PROGRAM_ID);
   let hash: string | undefined;

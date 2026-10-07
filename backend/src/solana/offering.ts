@@ -2,6 +2,7 @@ import { Keypair, PublicKey, TransactionInstruction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { fetchOffering } from './offering_state';
 import { adminKeypair } from './keys';
+import { ensureInvestorVerifiedForOps } from './kyc';
 import {
   ataOf,
   ixContribute,
@@ -115,6 +116,7 @@ export async function contributeOnChain(
   buyer: Keypair,
   amountUnits: bigint,
 ) {
+  await ensureInvestorVerifiedForOps(buyer.publicKey);
   const instruction = ixContribute({
     listingId,
     buyer: buyer.publicKey,
@@ -135,6 +137,8 @@ export async function prepareContributeTx(
   buyer: PublicKey,
   amountUnits: bigint,
 ) {
+  // Program requires a live Investor PDA; on Devnet we mint one without a form.
+  await ensureInvestorVerifiedForOps(buyer);
   const instruction = ixContribute({
     listingId,
     buyer,
@@ -184,6 +188,8 @@ export async function submitRefundTx(signedTx: string) {
 
 /** Crank distribute — delivers `wallet`'s units after a successful close. */
 export async function distributeOnChain(caller: Keypair, listingId: string, wallet: PublicKey) {
+  // Investor PDA must exist (thaw/freeze decision after delivery).
+  await ensureInvestorVerifiedForOps(wallet);
   const instruction = ixDistribute(caller.publicKey, listingId, wallet);
   return sendIxs(caller, [], [instruction]).catch((e) => {
     throw mapSolanaError(e);

@@ -7,7 +7,14 @@ import { getAllCommodityPrices } from './mocks/fiat_oracle';
 import { getMervalStocks } from './custody/stocks';
 import { canFinalizeFromSnapshot, parseOfferingState } from './solana/lifecycle_rules';
 import { settlementAction } from './market/settlement_rules';
-import { setCustody, custodialSigningKey, upsertLogin } from './auth/accounts';
+import {
+  setCustody,
+  custodialSigningKey,
+  upsertLogin,
+  requireApprovedTrader,
+  getAccount,
+} from './auth/accounts';
+import { isKycEnforced } from './solana/connection';
 
 console.log('=== INICIANDO SUITE DE PRUEBAS DE FRACTACHAIN BACKEND ===');
 
@@ -212,6 +219,21 @@ const pwUser = `pw-${Date.now()}@example.com`;
 upsertLogin({ email: pwUser, password: 'secret123' });
 assert(!throws(() => upsertLogin({ email: pwUser, password: 'secret123' })), 'Login con contraseña correcta sigue funcionando');
 assert(throws(() => upsertLogin({ email: pwUser, password: 'wrong123' })), 'Contraseña incorrecta se rechaza');
+
+console.log('\n[11] Probando soft KYC en Devnet (sin bloqueo duro):');
+assert(isKycEnforced() === false, 'Cluster default (devnet) no exige KYC duro');
+const soft = upsertLogin({ email: `soft-kyc-${Date.now()}@example.com`, name: 'Soft Kyc' });
+setCustody(soft.user.id, 'CUSTODIAL');
+const softAcct = getAccount(soft.user.id)!;
+softAcct.kycStatus = 'UNREGISTERED';
+let softTradeOk = true;
+try {
+  requireApprovedTrader(softAcct);
+} catch {
+  softTradeOk = false;
+}
+assert(softTradeOk, 'Devnet permite operar con wallet y KYC UNREGISTERED');
+assert(Boolean(softAcct.publicKey), 'Custodia crea publicKey Solana');
 
 console.log(`\n=== RESUMEN: ${testsPassed} PASADOS, ${testsFailed} FALLIDOS ===\n`);
 if (testsFailed > 0) {

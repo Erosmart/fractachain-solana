@@ -4,7 +4,9 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowUpRight, CheckCircle2, MousePointerClick, ShieldCheck, Zap } from 'lucide-react';
+import SoftKycNotice from '../../components/SoftKycNotice';
 import { API_BASE_URL, bearerHeaders } from '../../lib/api';
+import { isKycRequired } from '../../lib/devnetMode';
 import { isVisibleListing } from '../../lib/listings';
 import { useAuth } from '../../context/AuthContext';
 import { useI18n } from '../../context/I18nContext';
@@ -158,7 +160,12 @@ function OrderbookInner() {
   // frozen/thawed flag is literally what decides whether the token program accepts the
   // order, so reading anything else would let the UI promise a trade the
   // network will reject.
-  const approved = onSdex ? Boolean(book?.authorized) : user?.kycStatus === 'APPROVED';
+  // Devnet soft KYC: sandbox book only needs a connected wallet; mainnet keeps APPROVED.
+  const approved = onSdex
+    ? Boolean(book?.authorized)
+    : isKycRequired()
+      ? user?.kycStatus === 'APPROVED'
+      : Boolean(user?.custodyMode && user?.publicKey);
   const needsTrustline = onSdex
     ? Boolean(book?.needsTrustline)
     : side === 'BUY' && approved && !user?.trustlines?.includes(listingId);
@@ -398,6 +405,7 @@ function OrderbookInner() {
 
   return (
     <div className="space-y-6 py-4">
+      <SoftKycNotice />
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <p className="font-lcd text-[11px] uppercase tracking-[0.2em] text-neutral-500">{t('ob.kicker')}</p>
@@ -639,11 +647,14 @@ function OrderbookInner() {
                   })}
                 </p>
               )}
-              {!approved && (
+              {!approved && isKycRequired() && (
                 <p className="text-sm text-neutral-600">
                   {t('ob.kycOnly')}{' '}
                   <Link href="/login" className="underline font-bold">{t('nav.login')}</Link>
                 </p>
+              )}
+              {!approved && !isKycRequired() && (
+                <p className="text-sm text-neutral-600">{t('kycSoft.body')}</p>
               )}
               {needsTrustline && (
                 <div className="px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs space-y-2">

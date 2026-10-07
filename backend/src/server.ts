@@ -78,7 +78,8 @@ import { snapshotToApi } from './solana/onchain';
 import { usdcToUnits, unitsToUsdc, usdcMint, mintDemoUsdc, buildCreateUsdcAtaIx } from './solana/usdc';
 import { createMarket, authorizeVault } from './solana/manifest';
 import { initializePlatformOnChain } from './solana/platform';
-import { setHolderFrozenOnChain, verifyInvestorOnChain } from './solana/kyc';
+import { ensureInvestorVerifiedForOps, setHolderFrozenOnChain, verifyInvestorOnChain } from './solana/kyc';
+import { isKycEnforced, SOLANA_CLUSTER } from './solana/connection';
 import { buildUnsignedTx, submitSignedTx } from './solana/tx';
 import { PublicKey } from '@solana/web3.js';
 import { setListingMarket } from './admin/listings';
@@ -168,14 +169,18 @@ function requireAdmin(req: Request, res: Response) {
 
 // Health Check
 app.get('/health', (_req: Request, res: Response) => {
+  const cluster = SOLANA_CLUSTER;
   res.json({
     status: 'online',
     service: 'Fractachain Admin & Mocks Backend',
     protocol: 'Solana (Anchor + Token-2022 + Manifest)',
     network: isProgramDeployed()
-      ? `Solana ${process.env.SOLANA_CLUSTER || 'devnet'} (program loaded)`
-      : `Solana ${process.env.SOLANA_CLUSTER || 'devnet'} (sandbox — programa sin deployar)`,
+      ? `Solana ${cluster} (program loaded)`
+      : `Solana ${cluster} (sandbox — programa sin deployar)`,
+    cluster,
     onChain: isProgramDeployed(),
+    /** false on Devnet/testnet/localnet — KYC is soft; true only on mainnet-beta. */
+    kycRequired: isKycEnforced(),
     persistence: process.env.DATABASE_URL ? 'postgres' : 'files (se pierde en cada redeploy)',
     googleLogin: process.env.FIREBASE_API_KEY ? 'verified' : process.env.NODE_ENV === 'production' ? 'disabled' : 'dev-unverified',
     timestamp: new Date().toISOString(),
@@ -944,8 +949,18 @@ app.post('/api/listings/:id/trustline', (req: Request, res: Response) => {
       await openCustodialTrustline({ listingId: listing.id, accountId: account.id });
     }
     // Thaw the holder's ATA so transfers accept it — admin-signed compliance.
-    if (listing && isOnChainListing(listing) && account.publicKey && account.kycStatus === 'APPROVED') {
-      await setHolderFrozenOnChain(listing.id, new PublicKey(account.publicKey), false).catch(
+    // Devnet: allow without form KYC (Investor PDA is auto-verified when needed).
+    if (
+      listing &&
+      isOnChainListing(listing) &&
+      account.publicKey &&
+      (!isKycEnforced() || account.kycStatus === 'APPROVED')
+    ) {
+      const wallet = new PublicKey(account.publicKey);
+      await ensureInvestorVerifiedForOps(wallet).catch((e) =>
+        console.warn('[kyc-auto]', e?.message || e),
+      );
+      await setHolderFrozenOnChain(listing.id, wallet, false).catch(
         (e) => console.warn('[thaw]', e?.message || e),
       );
     }
@@ -1027,7 +1042,9 @@ app.post('/api/admin/testnet/configure-issuer', (req: Request, res: Response) =>
     // fee + KYC-hour enforcement on the platform PDA (one-time).
     const hash = await initializePlatformOnChain({
       feeBps: Number(req.body?.feeBps ?? 0),
-      enforceKycHours: req.body?.enforceKycHours != null ? Boolean(req.body.enforceKycHours) : true,
+      // Devnet default: do not gate verify_investor on ART business hours.
+      enforceKycHours:
+        req.body?.enforceKycHours != null ? Boolean(req.body.enforceKycHours) : isKycEnforced(),
     });
     return { hash };
   }, res);
