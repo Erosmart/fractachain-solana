@@ -7,6 +7,7 @@ import { getAllCommodityPrices } from './mocks/fiat_oracle';
 import { getMervalStocks } from './custody/stocks';
 import { canFinalizeFromSnapshot, parseOfferingState } from './solana/lifecycle_rules';
 import { settlementAction } from './market/settlement_rules';
+import { setCustody, custodialSigningKey, upsertLogin } from './auth/accounts';
 
 console.log('=== INICIANDO SUITE DE PRUEBAS DE FRACTACHAIN BACKEND ===');
 
@@ -171,6 +172,26 @@ assert(
   settlementAction({ status: 'CLOSED_FAILED', onChain: true }) === 'skip',
   'Cerrada fallida no acredita nada (el inversor usa refund)',
 );
+
+console.log('\n[9] Probando que ninguna respuesta filtre material secreto:');
+
+const secAuth = upsertLogin({ email: 'sec-check@example.com', name: 'Sec Check' });
+assert(secAuth.success === true, 'Cuenta de prueba de secretos creada');
+
+let selfNoKey = false;
+try {
+  setCustody(secAuth.user.id, 'SELF');
+} catch {
+  selfNoKey = true;
+}
+assert(selfNoKey, 'Self-custody sin publicKey se rechaza (ya no se genera clave en el server)');
+
+const custRes = setCustody(secAuth.user.id, 'CUSTODIAL');
+const custPayload = JSON.stringify(custRes);
+assert(!/secretKey|secretOnce|"secret"/i.test(custPayload), 'Respuesta de custodia no incluye secretKey/secretOnce/secret');
+const internal = custodialSigningKey(secAuth.user.id);
+assert(!custPayload.includes(internal), 'La secret key real no aparece serializada en la respuesta');
+assert(!/secretKey|secretOnce|"secret"/i.test(JSON.stringify(secAuth.user)), 'El objeto user público no expone secretKey');
 
 console.log(`\n=== RESUMEN: ${testsPassed} PASADOS, ${testsFailed} FALLIDOS ===\n`);
 if (testsFailed > 0) {

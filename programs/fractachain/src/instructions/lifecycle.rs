@@ -20,20 +20,20 @@ pub struct Contribute<'info> {
         seeds = [INVESTOR_SEED, buyer.key().as_ref()],
         bump = investor.bump,
     )]
-    pub investor: Account<'info, Investor>,
+    pub investor: Box<Account<'info, Investor>>,
     #[account(
         mut,
         seeds = [OFFERING_SEED, offering.listing_seed.as_ref()],
         bump = offering.bump,
     )]
-    pub offering: Account<'info, Offering>,
+    pub offering: Box<Account<'info, Offering>>,
     /// Buyer's USDC/USDT source.
     #[account(
         mut,
         token::authority = buyer,
         constraint = buyer_payment_ata.mint == offering.payment_mint,
     )]
-    pub buyer_payment_ata: InterfaceAccount<'info, TokenAccount>,
+    pub buyer_payment_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     /// Buyer's RWA ATA — created frozen, then thawed (KYC'd holder).
     #[account(
         init_if_needed,
@@ -42,15 +42,15 @@ pub struct Contribute<'info> {
         associated_token::authority = buyer,
         associated_token::token_program = token_2022_program,
     )]
-    pub buyer_rwa_ata: InterfaceAccount<'info, TokenAccount>,
+    pub buyer_rwa_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(address = offering.rwa_mint)]
-    pub rwa_mint: InterfaceAccount<'info, Mint>,
+    pub rwa_mint: Box<InterfaceAccount<'info, Mint>>,
     #[account(address = offering.payment_mint)]
-    pub payment_mint: InterfaceAccount<'info, Mint>,
+    pub payment_mint: Box<InterfaceAccount<'info, Mint>>,
     #[account(mut, address = offering.treasury_ata)]
-    pub treasury_ata: InterfaceAccount<'info, TokenAccount>,
+    pub treasury_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(mut, address = offering.escrow_ata)]
-    pub escrow_ata: InterfaceAccount<'info, TokenAccount>,
+    pub escrow_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         init_if_needed,
         payer = buyer,
@@ -58,7 +58,7 @@ pub struct Contribute<'info> {
         seeds = [CONTRIBUTION_SEED, offering.key().as_ref(), buyer.key().as_ref()],
         bump,
     )]
-    pub contribution: Account<'info, Contribution>,
+    pub contribution: Box<Account<'info, Contribution>>,
     /// CHECK: Opa PDA, created manually if the 50% threshold trips.
     #[account(mut)]
     pub opa: UncheckedAccount<'info>,
@@ -342,7 +342,7 @@ pub struct Refund<'info> {
         bump = offering.bump,
         constraint = offering.state == OfferingState::Failed @ FractachainError::NotFailed,
     )]
-    pub offering: Account<'info, Offering>,
+    pub offering: Box<Account<'info, Offering>>,
     #[account(
         mut,
         close = contributor,
@@ -350,7 +350,7 @@ pub struct Refund<'info> {
         bump = contribution.bump,
         has_one = wallet @ FractachainError::NotContributionOwner,
     )]
-    pub contribution: Account<'info, Contribution>,
+    pub contribution: Box<Account<'info, Contribution>>,
     /// CHECK: alias of contributor for the has_one above.
     #[account(address = contributor.key())]
     pub wallet: UncheckedAccount<'info>,
@@ -362,15 +362,15 @@ pub struct Refund<'info> {
             &contributor.key(), &rwa_mint.key(), &spl_token_2022::ID,
         ),
     )]
-    pub contributor_rwa_ata: InterfaceAccount<'info, TokenAccount>,
+    pub contributor_rwa_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(address = offering.rwa_mint)]
-    pub rwa_mint: InterfaceAccount<'info, Mint>,
+    pub rwa_mint: Box<InterfaceAccount<'info, Mint>>,
     #[account(address = offering.payment_mint)]
-    pub payment_mint: InterfaceAccount<'info, Mint>,
+    pub payment_mint: Box<InterfaceAccount<'info, Mint>>,
     #[account(mut, address = offering.treasury_ata)]
-    pub treasury_ata: InterfaceAccount<'info, TokenAccount>,
+    pub treasury_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(mut, address = offering.escrow_ata)]
-    pub escrow_ata: InterfaceAccount<'info, TokenAccount>,
+    pub escrow_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         init_if_needed,
         payer = contributor,
@@ -378,7 +378,7 @@ pub struct Refund<'info> {
         associated_token::authority = contributor,
         associated_token::token_program = payment_token_program,
     )]
-    pub contributor_payment_ata: InterfaceAccount<'info, TokenAccount>,
+    pub contributor_payment_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     pub token_2022_program: Program<'info, anchor_spl::token_2022::Token2022>,
     pub payment_token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, anchor_spl::associated_token::AssociatedToken>,

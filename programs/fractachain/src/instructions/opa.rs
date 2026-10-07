@@ -175,20 +175,20 @@ pub struct AcceptOpa<'info> {
         seeds = [INVESTOR_SEED, opa.acquirer.as_ref()],
         bump = acquirer_investor.bump,
     )]
-    pub acquirer_investor: Account<'info, Investor>,
+    pub acquirer_investor: Box<Account<'info, Investor>>,
     #[account(
         mut,
         seeds = [OFFERING_SEED, offering.listing_seed.as_ref()],
         bump = offering.bump,
     )]
-    pub offering: Account<'info, Offering>,
+    pub offering: Box<Account<'info, Offering>>,
     #[account(
         mut,
         seeds = [OPA_SEED, offering.key().as_ref()],
         bump = opa.bump,
         constraint = opa.state == OpaState::ActiveOffer @ FractachainError::OpaNotActive,
     )]
-    pub opa: Account<'info, Opa>,
+    pub opa: Box<Account<'info, Opa>>,
     /// Seller's whole balance is sold — may be frozen, delegate handles it.
     #[account(
         mut,
@@ -197,7 +197,7 @@ pub struct AcceptOpa<'info> {
             &seller.key(), &offering.rwa_mint, &spl_token_2022::ID,
         ),
     )]
-    pub seller_rwa_ata: InterfaceAccount<'info, TokenAccount>,
+    pub seller_rwa_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         token::authority = acquirer,
@@ -205,19 +205,19 @@ pub struct AcceptOpa<'info> {
             &opa.acquirer, &offering.rwa_mint, &spl_token_2022::ID,
         ),
     )]
-    pub acquirer_rwa_ata: InterfaceAccount<'info, TokenAccount>,
+    pub acquirer_rwa_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         token::authority = seller,
         constraint = seller_payment_ata.mint == offering.payment_mint,
     )]
-    pub seller_payment_ata: InterfaceAccount<'info, TokenAccount>,
+    pub seller_payment_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(mut, address = offering.escrow_ata)]
-    pub escrow_ata: InterfaceAccount<'info, TokenAccount>,
+    pub escrow_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(address = offering.rwa_mint)]
-    pub rwa_mint: InterfaceAccount<'info, Mint>,
+    pub rwa_mint: Box<InterfaceAccount<'info, Mint>>,
     #[account(address = offering.payment_mint)]
-    pub payment_mint: InterfaceAccount<'info, Mint>,
+    pub payment_mint: Box<InterfaceAccount<'info, Mint>>,
     pub token_2022_program: Program<'info, anchor_spl::token_2022::Token2022>,
     pub payment_token_program: Interface<'info, TokenInterface>,
 }
