@@ -63,17 +63,32 @@ export function solanaLinkPayload(): Promise<WalletLoginPayload> {
   return signPayload('fractachain-link:');
 }
 
+function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function bytesToB64(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
 /**
  * Signs a transaction the backend already built (base64-serialized
  * `Transaction`). The wallet is the fee payer / required signer — the backend
  * never holds the key. Returns the signed tx re-serialized to base64.
+ *
+ * Uses browser base64 helpers (no Node `Buffer` polyfill required).
  */
 export async function solanaSignTransaction(base64Tx: string): Promise<string> {
   const w = requireWallet();
   if (!w.connected || !w.publicKey) await connectWallet();
   const ctx = requireWallet();
   if (!ctx.signTransaction) throw new Error(tClient('err.walletNoSignedTx'));
-  const tx = Transaction.from(Buffer.from(base64Tx, 'base64'));
+  const tx = Transaction.from(b64ToBytes(base64Tx));
   const signed = await ctx.signTransaction(tx);
-  return Buffer.from(signed.serialize()).toString('base64');
+  return bytesToB64(signed.serialize());
 }

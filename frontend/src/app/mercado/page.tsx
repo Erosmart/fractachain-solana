@@ -27,7 +27,7 @@ type Pool = {
   onChain: boolean;
 };
 
-type ContributeResult = { onChain?: { contributeHash?: string } };
+type ContributeResult = { onChain?: { contributeHash?: string; hash?: string } };
 
 const fmt = (n: number) => (Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—');
 
@@ -65,7 +65,7 @@ function PoolCard({ pool, onDone }: { pool: Pool; onDone: () => void }) {
         if (!res.ok || !json.success) throw new Error(json.message || t('acct.errorGeneric'));
         data = json.data;
       }
-      setMsg({ ok: true, text: t('acct.subscribed'), tx: data?.onChain?.contributeHash });
+      setMsg({ ok: true, text: t('acct.subscribed'), tx: data?.onChain?.contributeHash || data?.onChain?.hash });
       await refreshUser();
       onDone();
     } catch (err: any) {

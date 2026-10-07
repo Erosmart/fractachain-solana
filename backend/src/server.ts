@@ -77,7 +77,11 @@ import { fetchOffering, fetchContribution } from './solana/offering_state';
 import { snapshotToApi } from './solana/onchain';
 import { usdcToUnits, unitsToUsdc, usdcMint, mintDemoUsdc, buildCreateUsdcAtaIx } from './solana/usdc';
 import { createMarket, authorizeVault } from './solana/manifest';
-import { initializePlatformOnChain } from './solana/platform';
+import {
+  initializePlatformOnChain,
+  setConfiguredUsdcMintOnChain,
+  setPaymentMintOnChain,
+} from './solana/platform';
 import { ensureInvestorVerifiedForOps, setHolderFrozenOnChain, verifyInvestorOnChain } from './solana/kyc';
 import { isKycEnforced, SOLANA_CLUSTER } from './solana/connection';
 import { buildUnsignedTx, submitSignedTx } from './solana/tx';
@@ -1039,14 +1043,32 @@ app.post('/api/admin/testnet/configure-issuer', (req: Request, res: Response) =>
   if (!requireAdmin(req, res)) return;
   wrapAsync(async () => {
     // Solana equivalent of issuer flags config: initialize_platform records
-    // fee + KYC-hour enforcement on the platform PDA (one-time).
+    // fee + KYC-hour enforcement on the platform PDA. Re-runnable: skips init
+    // when the PDA exists and applies set_payment_mint when USDC is configured.
     const hash = await initializePlatformOnChain({
       feeBps: Number(req.body?.feeBps ?? 0),
       // Devnet default: do not gate verify_investor on ART business hours.
       enforceKycHours:
         req.body?.enforceKycHours != null ? Boolean(req.body.enforceKycHours) : isKycEnforced(),
     });
-    return { hash };
+    return { hash, usdcMint: usdcMint()?.toBase58() || null };
+  }, res);
+});
+
+/** Allowlist the cluster USDC mint on an already-initialized platform PDA. */
+app.post('/api/admin/testnet/set-payment-mint', (req: Request, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+  wrapAsync(async () => {
+    const kind = String(req.body?.kind || 'USDC').toUpperCase() === 'USDT' ? 'USDT' : 'USDC';
+    const mintStr = String(req.body?.mint || '').trim();
+    const hash = mintStr
+      ? await setPaymentMintOnChain(kind, new PublicKey(mintStr))
+      : await setConfiguredUsdcMintOnChain();
+    return {
+      hash,
+      kind,
+      mint: mintStr || usdcMint()?.toBase58() || null,
+    };
   }, res);
 });
 

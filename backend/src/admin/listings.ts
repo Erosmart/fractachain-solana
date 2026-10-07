@@ -273,6 +273,12 @@ export function assertMintable(id: string, amount: number): Listing {
   if (!listing) throw new Error('Listing no encontrado');
   if (listing.status === 'DRAFT') throw new Error('Primero deployá el contrato');
   if (amount <= 0) throw new Error('Monto inválido');
+  // Program `mint_supply` is one-shot (Draft → Minted). Incremental remints fail with NotDraft.
+  if (isOnChainListing(listing) && (listing.tokensMinted > 0 || listing.status === 'TOKENS_MINTED')) {
+    throw new Error(
+      'mint_supply on-chain es de una sola vez; esta emisión ya tiene supply mintado',
+    );
+  }
   const next = listing.tokensMinted + amount;
   if (next > listing.dossier.sharesToTokenize) {
     throw new Error('No se puede mintear más que las acciones a tokenizar');

@@ -16,8 +16,16 @@ import {
 } from './auth/accounts';
 import { isKycEnforced } from './solana/connection';
 import { isSolanaAddress, isSolanaPublicKey } from './solana/keys';
-import { isOnChainListing, Listing } from './admin/listings';
+import {
+  assertMintable,
+  createListing,
+  deployListing,
+  isOnChainListing,
+  mintListingTokens,
+  Listing,
+} from './admin/listings';
 import { offeringPda } from './solana/pda';
+import { usdcMint } from './solana/usdc';
 
 console.log('=== INICIANDO SUITE DE PRUEBAS DE FRACTACHAIN BACKEND ===');
 
@@ -257,6 +265,63 @@ console.log('\n[12] Probando que Offering PDAs cuentan como on-chain (no isOnCur
     licitacionContract: '',
   } as Listing;
   assert(isOnChainListing(sandboxListing) === false, 'isOnChainListing rechaza address que no es el PDA');
+}
+
+console.log('\n[13] mint_supply one-shot guard + USDC mint env precedence:');
+{
+  const prev = process.env.SOLANA_USDC_MINT;
+  process.env.SOLANA_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+  try {
+    const mint = usdcMint();
+    assert(
+      mint?.toBase58() === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+      'usdcMint lee env antes que deployments',
+    );
+  } finally {
+    if (prev == null) delete process.env.SOLANA_USDC_MINT;
+    else process.env.SOLANA_USDC_MINT = prev;
+  }
+
+  const tag = Date.now().toString(36).toUpperCase().slice(-4);
+  const created = createListing({
+    legalName: 'Mint Once SA',
+    tradeName: 'MintOnce',
+    cuit: '30-12345678-9',
+    jurisdiction: 'Argentina',
+    sector: 'Agro',
+    ticker: `MNT${tag}`,
+    tokenTicker: `tMNT${tag}`.slice(0, 12),
+    isin: `ARMNT${tag}000`,
+    authorizedShares: 1_000_000,
+    sharesToTokenize: 1000,
+    pricePerShareUsdc: 10,
+    cajaSubaccount: `CV-MNT-${tag}`,
+    custodianCuit: '30-50001091-2',
+    cnvRecordId: `CNV-MNT-${tag}`,
+    bymaRequestId: '',
+    legalTermsUri: 'https://fractachain.ar/legal/demo',
+    estatutoHash: 'a'.repeat(64),
+    auditor: 'PwC',
+    issuerPublicKey: '5xot9PVkPHVfvWxvXzMhQq9rY5vWn1bVfQ7kQp8mE3xJ',
+    proceedsWallet: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+    paymentKind: 'USDC',
+    offeringSoftCapUsdc: 100,
+    offeringHardCapUsdc: 1000,
+    offeringDays: 30,
+    tnaUsd: 0,
+    minInvestmentUsdc: 20,
+    useOfProceeds: 'Test mint one-shot guard',
+  });
+  const [pda] = offeringPda(created.id);
+  deployListing(created.id, { contractId: pda.toBase58() });
+  mintListingTokens(created.id, 100);
+  let blocked = false;
+  try {
+    assertMintable(created.id, 50);
+  } catch (e: any) {
+    blocked = /una sola vez|one-shot|mint_supply/i.test(String(e?.message || e));
+  }
+  assert(blocked, 'Segundo mint on-chain se bloquea cuando tokensMinted > 0');
 }
 
 console.log(`\n=== RESUMEN: ${testsPassed} PASADOS, ${testsFailed} FALLIDOS ===\n`);
