@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletReadyState, type WalletName } from '@solana/wallet-adapter-base';
 import { useI18n } from '../context/I18nContext';
@@ -11,11 +11,16 @@ const INSTALL_LINKS = [
   { name: 'Backpack', url: 'https://backpack.app/download' },
 ];
 
+/** MetaMask may register a Solana Wallet Standard account; keep the Solana path clear. */
+function isSolanaNativeWallet(name: string): boolean {
+  return !/metamask|rabby|coinbase|rainbow|trust\s*wallet|okx/i.test(name);
+}
+
 /**
- * Lists the Wallet Standard wallets the browser exposes and, once the chosen
- * one is connected, runs `onConnected` (sign-in or link signature). The
- * action reads the wallet through the solanaWallet.ts bridge, which only sees
- * the new connection after this render commits — hence the deferred call.
+ * Lists installed Solana wallets (Wallet Standard) and, once the chosen one is
+ * connected, runs `onConnected` (sign-in or link signature). The action reads
+ * the wallet through the solanaWallet.ts bridge, which only sees the new
+ * connection after this render commits — hence the deferred call.
  */
 export default function WalletPicker({
   onConnected,
@@ -30,9 +35,20 @@ export default function WalletPicker({
   const [busy, setBusy] = useState(false);
   const ran = useRef(false);
 
-  const available = wallets.filter(
-    (w) => w.readyState === WalletReadyState.Installed || w.readyState === WalletReadyState.Loadable,
+  const available = useMemo(
+    () =>
+      wallets.filter(
+        (w) =>
+          isSolanaNativeWallet(w.adapter.name) &&
+          (w.readyState === WalletReadyState.Installed || w.readyState === WalletReadyState.Loadable),
+      ),
+    [wallets],
   );
+
+  const missingInstalls = useMemo(() => {
+    const present = new Set(available.map((w) => w.adapter.name.toLowerCase()));
+    return INSTALL_LINKS.filter((w) => !present.has(w.name.toLowerCase()));
+  }, [available]);
 
   const fail = (err: unknown) => {
     setPending(null);
@@ -115,6 +131,24 @@ export default function WalletPicker({
           </button>
         );
       })}
+      {missingInstalls.length > 0 && (
+        <div className="pt-2">
+          <p className="text-[11px] text-black/45 mb-1.5">{t('acct.otherSolanaWallets')}</p>
+          <div className="flex flex-wrap gap-2">
+            {missingInstalls.map((w) => (
+              <a
+                key={w.name}
+                href={w.url}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full border border-black/15 px-3 py-1.5 text-xs font-bold hover:bg-black/[0.04]"
+              >
+                {w.name}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
       {pending && (
         <button
           type="button"

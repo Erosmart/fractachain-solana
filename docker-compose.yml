@@ -1,8 +1,9 @@
 # Local stand-in for the two Railway services.
 #   docker compose up --build
 #
-# The UI talks to the API at localhost:8080 from the browser.
-# For a public Railway URL, rebuild the frontend with that URL as NEXT_PUBLIC_API_URL.
+# Browser → frontend:3000/api/* → Next rewrite → backend:8080 (BACKEND_URL).
+# Optional: set NEXT_PUBLIC_API_URL to a *public backend* origin for split hosting
+# (rebuild frontend). Never point it at the frontend URL.
 services:
   backend:
     build:
@@ -38,7 +39,9 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+        # Empty → same-origin /api proxy. Set only for a separate public API URL.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+        BACKEND_URL: http://backend:8080
     ports:
       - "3000:3000"
     environment:

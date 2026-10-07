@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start -p ${PORT:-3000}",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:api-base": "node scripts/check-api-base.mjs"
   },
   "dependencies": {
     "@solana/wallet-adapter-base": "^0.9.28",
