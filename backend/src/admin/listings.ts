@@ -5,9 +5,10 @@ import { PaymentKind } from './issuance';
 import { persistToPg } from '../data/pgstore';
 import { addHolding, creditCash, debitCash, findAccountByPublicKey, getAccount, requireApprovedTrader } from '../auth/accounts';
 import { getTestnetConfig } from './testnet';
-import { isSolanaPublicKey } from '../solana/keys';
+import { isSolanaAddress, isSolanaPublicKey, adminPublicKey } from '../solana/keys';
 import { loadDeployment } from '../solana/deployment';
-import { adminPublicKey } from '../solana/keys';
+import { offeringPda } from '../solana/pda';
+import { PublicKey } from '@solana/web3.js';
 
 export type ListingStatus =
   | 'DRAFT'
@@ -242,17 +243,22 @@ export function listingCvDepositHash(listing: Listing): string {
 
 export function deployListing(id: string, onChain?: { contractId: string }): Listing {
   const listing = assertDeployable(id);
-  const chain = loadDeployment();
-  listing.stockContract = onChain?.contractId || '' ||contractId(`${listing.id}:stock`);
-  // The licitación gets its own instance when the offering opens; pointing at
-  // the shared one here made every listing inherit its payout wallet.
-  listing.licitacionContract = '';
+  if (onChain?.contractId) {
+    // Solana: one Offering PDA covers custody + primary sale. Keep both
+    // fields pointing at it so mint/contribute/settlement recognize on-chain.
+    listing.stockContract = onChain.contractId;
+    listing.licitacionContract = onChain.contractId;
+  } else {
+    listing.stockContract = contractId(`${listing.id}:stock`);
+    // Sandbox: licitación address is assigned when the offering opens.
+    listing.licitacionContract = '';
+  }
   listing.factoryProductId = listings.filter((l) => l.factoryProductId).length + 1;
   listing.deployedAt = new Date().toISOString();
   listing.status = 'DEPLOYED';
   listing.cvDepositHash = listingCvDepositHash(listing);
   if (!isSolanaPublicKey(listing.dossier.issuerPublicKey)) {
-    listing.dossier.issuerPublicKey = adminPublicKey() || '' || '';
+    listing.dossier.issuerPublicKey = adminPublicKey() || '';
   }
   save();
   return listing;
@@ -561,10 +567,22 @@ function payListingProceeds(listing: Listing) {
   }
 }
 
+/**
+ * True when this listing's stored address is the program's Offering PDA for
+ * its listing id. Sandbox fake base58 IDs and on-curve wallet typos do not match.
+ *
+ * Important: Offering PDAs are off-curve — never use `isSolanaPublicKey`
+ * (ed25519 on-curve check) here or mint/contribute/finalize stay in sandbox.
+ */
 export function isOnChainListing(listing: Listing): boolean {
-  // The Offering PDA covers custody + primary sale + secondary; a valid
-  // base58 address here means the listing lives on-chain.
-  return isSolanaPublicKey(listing.licitacionContract);
+  const addr = (listing.licitacionContract || listing.stockContract || '').trim();
+  if (!addr || !isSolanaAddress(addr)) return false;
+  try {
+    const [expected] = offeringPda(listing.id);
+    return expected.equals(new PublicKey(addr));
+  } catch {
+    return false;
+  }
 }
 
 export function bindLicitacionForDemo(
@@ -574,10 +592,11 @@ export function bindLicitacionForDemo(
 ): Listing {
   const listing = listings.find((l) => l.id === id);
   if (!listing) throw new Error('Listing no encontrado');
-  if (!isSolanaPublicKey(contractId)) {
+  if (!isSolanaAddress(contractId)) {
     throw new Error(`Dirección del offering inválida: ${contractId}`);
   }
   listing.licitacionContract = contractId;
+  listing.stockContract = listing.stockContract || contractId;
   // Must match the token the contract was initialized with — the contract
   // itself rejects any other asset, so a wrong label just produces bad UX.
   listing.dossier.paymentKind = opts?.paymentKind === 'SOL' ? 'SOL' : 'USDC';

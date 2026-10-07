@@ -15,6 +15,9 @@ import {
   getAccount,
 } from './auth/accounts';
 import { isKycEnforced } from './solana/connection';
+import { isSolanaAddress, isSolanaPublicKey } from './solana/keys';
+import { isOnChainListing, Listing } from './admin/listings';
+import { offeringPda } from './solana/pda';
 
 console.log('=== INICIANDO SUITE DE PRUEBAS DE FRACTACHAIN BACKEND ===');
 
@@ -234,6 +237,27 @@ try {
 }
 assert(softTradeOk, 'Devnet permite operar con wallet y KYC UNREGISTERED');
 assert(Boolean(softAcct.publicKey), 'Custodia crea publicKey Solana');
+
+console.log('\n[12] Probando que Offering PDAs cuentan como on-chain (no isOnCurve):');
+{
+  const listingId = `listing-pda-test-${Date.now()}`;
+  const [pda] = offeringPda(listingId);
+  const pdaStr = pda.toBase58();
+  assert(isSolanaAddress(pdaStr) === true, 'isSolanaAddress acepta PDA off-curve');
+  assert(isSolanaPublicKey(pdaStr) === false, 'isSolanaPublicKey rechaza PDA (off-curve)');
+  const fakeListing = {
+    id: listingId,
+    stockContract: pdaStr,
+    licitacionContract: pdaStr,
+  } as Listing;
+  assert(isOnChainListing(fakeListing) === true, 'isOnChainListing reconoce Offering PDA');
+  const sandboxListing = {
+    id: listingId,
+    stockContract: 'SandboxFake1111111111111111111111111111111',
+    licitacionContract: '',
+  } as Listing;
+  assert(isOnChainListing(sandboxListing) === false, 'isOnChainListing rechaza address que no es el PDA');
+}
 
 console.log(`\n=== RESUMEN: ${testsPassed} PASADOS, ${testsFailed} FALLIDOS ===\n`);
 if (testsFailed > 0) {

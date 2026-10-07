@@ -838,7 +838,7 @@ app.post('/api/listings/:id/licitacion', (req: Request, res: Response) => {
     // fiduciary inside the same Offering PDA — nothing left to repoint.
     let onChain: { contractId: string } | undefined;
     let openHash: string | undefined;
-    if (isProgramDeployed() && hasAdminSecret() && isOnChainListing({ licitacionContract: draft.stockContract } as any)) {
+    if (isProgramDeployed() && hasAdminSecret() && isOnChainListing(draft)) {
       openHash = await openOfferingOnChain({
         listingId: draft.id,
         fiduciary: new PublicKey(draft.dossier.proceedsWallet),
@@ -847,7 +847,7 @@ app.post('/api/listings/:id/licitacion', (req: Request, res: Response) => {
         deadline: BigInt(Math.floor(deadlineMs / 1000)),
         pricePerUnit: usdcToUnits(draft.dossier.pricePerShareUsdc),
       });
-      onChain = { contractId: draft.stockContract };
+      onChain = { contractId: draft.stockContract || draft.licitacionContract };
     }
     const listing = openLicitacion(req.params.id, opts, onChain);
     return {
