@@ -1,5 +1,6 @@
 import { PublicKey } from '@solana/web3.js';
 import { TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
+import { isKycEnforced } from './connection';
 import { adminKeypair } from './keys';
 import {
   ataOf,
@@ -40,6 +41,22 @@ export async function verifyInvestorOnChain(
   ).catch((e) => {
     throw mapSolanaError(e);
   });
+}
+
+/**
+ * Ensures the Investor PDA exists and is active before an on-chain op that
+ * requires `is_investor_verified` (contribute, OPA, etc.).
+ *
+ * On non-mainnet this auto-verifies without a completed KYC form so Devnet
+ * flows are not blocked. On mainnet it only succeeds if compliance already
+ * called `verify_investor`.
+ */
+export async function ensureInvestorVerifiedForOps(wallet: PublicKey): Promise<void> {
+  if (await isInvestorVerifiedOnChain(wallet)) return;
+  if (isKycEnforced()) {
+    throw new Error('KYC on-chain requerido: el inversor no está verificado');
+  }
+  await verifyInvestorOnChain(wallet);
 }
 
 export async function revokeInvestorOnChain(wallet: PublicKey): Promise<string> {

@@ -30,6 +30,16 @@ export const SOLANA_RPC_URL =
 
 export const isLocalCluster = SOLANA_CLUSTER === 'localnet' || SOLANA_CLUSTER === 'devnet';
 
+/**
+ * Hard KYC gates (API + onboarding) apply only on mainnet-beta.
+ * On devnet/testnet/localnet the product skips KYC so core flows stay usable;
+ * the Anchor program still needs an Investor PDA — callers should use
+ * `ensureInvestorVerifiedForOps` before contribute/trade on-chain.
+ */
+export function isKycEnforced(): boolean {
+  return SOLANA_CLUSTER === 'mainnet-beta';
+}
+
 /** Devnet/localnet airdrops + demo USDC grants are opt-in: nothing touches the network unless SOLANA_AUTO_FAUCET=true. */
 export function autoFaucetEnabled(): boolean {
   return process.env.SOLANA_AUTO_FAUCET === 'true' && SOLANA_CLUSTER !== 'mainnet-beta';

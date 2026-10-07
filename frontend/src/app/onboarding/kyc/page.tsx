@@ -1,9 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import OnboardingStep from '../../../components/OnboardingStep';
 import { useAuth } from '../../../context/AuthContext';
 import { useI18n } from '../../../context/I18nContext';
+import { isDevnetSoftKyc } from '../../../lib/devnetMode';
 
 function readAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -25,6 +27,7 @@ export default function KycOnboardingPage() {
   const [error, setError] = useState('');
   // Wallet-only sign-ups have no email yet; Google/email accounts need a photo.
   const walletAccount = user?.authProvider === 'wallet';
+  const soft = isDevnetSoftKyc();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,9 +45,21 @@ export default function KycOnboardingPage() {
   const input = 'w-full rounded-xl border border-black/15 bg-white px-3 py-2.5 text-sm';
 
   return (
-    <OnboardingStep path="/onboarding/kyc">
+    // Devnet: KYC is optional — allow visiting after wallet while dest is /dashboard.
+    <OnboardingStep path="/onboarding/kyc" allow={soft ? ['/dashboard'] : []}>
       <h1 className="font-serif italic text-3xl sm:text-4xl">{t('onboarding.kycTitle')}</h1>
-      <p className="mt-2 text-sm text-black/60">{t('onboarding.kycLead')}</p>
+      <p className="mt-2 text-sm text-black/60">
+        {soft ? t('onboarding.kycLeadDevnet') : t('onboarding.kycLead')}
+      </p>
+
+      {soft && (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p>{t('kycSoft.body')}</p>
+          <Link href="/dashboard" className="mt-2 inline-block text-xs font-bold underline underline-offset-2">
+            {t('kycSoft.skip')}
+          </Link>
+        </div>
+      )}
 
       <form onSubmit={submit} className="mt-6 max-w-md space-y-3 rounded-2xl border border-brand-border bg-brand-card p-5 shadow-sm">
         <label className="block text-xs font-bold text-black/60">

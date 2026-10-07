@@ -43,10 +43,28 @@ export function openSecretKey(sealed: string): string {
   return Buffer.concat([decipher.update(Buffer.from(dataHex, 'hex')), decipher.final()]).toString('utf8');
 }
 
+/**
+ * True for any wallet/system account on the ed25519 curve.
+ * Use for fee-payers, fiduciaries, investor wallets — not for program PDAs.
+ */
 export function isSolanaPublicKey(value: string): boolean {
   try {
     const pk = new PublicKey(value);
     return PublicKey.isOnCurve(pk.toBytes());
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True for any valid base58 Pubkey, including off-curve PDAs (Offerings, etc.).
+ * Prefer this when validating on-chain account addresses stored on listings.
+ */
+export function isSolanaAddress(value: string): boolean {
+  try {
+    // eslint-disable-next-line no-new
+    new PublicKey(value);
+    return true;
   } catch {
     return false;
   }

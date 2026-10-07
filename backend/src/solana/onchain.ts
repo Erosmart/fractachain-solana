@@ -113,10 +113,17 @@ export async function snapshotOfferingApi(listingId: string) {
   return snap ? snapshotToApi(snap) : null;
 }
 
-export function isOnChainListing(listing: { licitacionContract?: string | null } | null): boolean {
-  if (!listing?.licitacionContract) return false;
+/**
+ * Loose check: stored address parses as a Pubkey (incl. PDAs). Prefer
+ * `admin/listings.isOnChainListing` when a listing id is available — that one
+ * matches against the derived Offering PDA and rejects sandbox fakes.
+ */
+export function isOnChainListing(listing: { licitacionContract?: string | null; stockContract?: string | null } | null): boolean {
+  const addr = listing?.licitacionContract || listing?.stockContract;
+  if (!addr) return false;
   try {
-    new PublicKey(listing.licitacionContract);
+    // eslint-disable-next-line no-new
+    new PublicKey(addr);
     return true;
   } catch {
     return false;
