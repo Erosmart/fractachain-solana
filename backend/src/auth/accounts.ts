@@ -275,6 +275,14 @@ export function upsertLogin(payload: {
   let account = [...accounts.values()].find((a) => a.email === email);
   const now = new Date().toISOString();
 
+  // Email+password never proves the email is yours. Admin emails must come
+  // through Google (token verified), and a Google-created account must not
+  // accept a password set by whoever tries first.
+  if (payload.password) {
+    if (isAdminEmail(email)) throw new Error('La cuenta de admin solo entra con Google');
+    if (account && !account.passwordHash) throw new Error('Esta cuenta entra con Google o con su wallet');
+  }
+
   if (!account) {
     if (payload.password && payload.password.length < 6) {
       throw new Error('La contraseña debe tener al menos 6 caracteres');
@@ -298,10 +306,10 @@ export function upsertLogin(payload: {
     accounts.set(account.id, account);
   } else {
     if (payload.password) {
-      if (account.passwordHash && !checkPassword(payload.password, account.passwordHash)) {
+      if (!checkPassword(payload.password, account.passwordHash!)) {
         throw new Error('Contraseña incorrecta');
       }
-      if (!account.passwordHash || !account.passwordHash.startsWith('s1:')) {
+      if (!account.passwordHash!.startsWith('s1:')) {
         account.passwordHash = hashPassword(payload.password);
       }
     }

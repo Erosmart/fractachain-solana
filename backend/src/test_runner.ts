@@ -193,6 +193,26 @@ const internal = custodialSigningKey(secAuth.user.id);
 assert(!custPayload.includes(internal), 'La secret key real no aparece serializada en la respuesta');
 assert(!/secretKey|secretOnce|"secret"/i.test(JSON.stringify(secAuth.user)), 'El objeto user público no expone secretKey');
 
+console.log('\n[10] Probando que nadie tome el email de admin ni una cuenta de Google con contraseña:');
+
+const throws = (fn: () => unknown) => {
+  try {
+    fn();
+    return false;
+  } catch {
+    return true;
+  }
+};
+const adminEmail = (process.env.ADMIN_EMAILS || 'erosnahuelp85@gmail.com').split(',')[0].trim();
+assert(throws(() => upsertLogin({ email: adminEmail, password: 'hijack123' })), 'Email+contraseña con el email de admin se rechaza');
+const googleOnly = `google-only-${Date.now()}@example.com`;
+upsertLogin({ email: googleOnly, uid: `fb_${Date.now()}`, name: 'Google Only' });
+assert(throws(() => upsertLogin({ email: googleOnly, password: 'hijack123' })), 'No se puede ponerle contraseña a una cuenta creada con Google');
+const pwUser = `pw-${Date.now()}@example.com`;
+upsertLogin({ email: pwUser, password: 'secret123' });
+assert(!throws(() => upsertLogin({ email: pwUser, password: 'secret123' })), 'Login con contraseña correcta sigue funcionando');
+assert(throws(() => upsertLogin({ email: pwUser, password: 'wrong123' })), 'Contraseña incorrecta se rechaza');
+
 console.log(`\n=== RESUMEN: ${testsPassed} PASADOS, ${testsFailed} FALLIDOS ===\n`);
 if (testsFailed > 0) {
   process.exit(1);
