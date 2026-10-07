@@ -4,12 +4,14 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
+import SoftKycNotice from '../../../components/SoftKycNotice';
 import { API_BASE_URL, bearerHeaders, getApiBaseUrl } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
 import { useI18n } from '../../../context/I18nContext';
+import { isKycRequired } from '../../../lib/devnetMode';
 import { formatInt } from '../../../lib/format';
+import { explorerAddress, explorerTx } from '../../../lib/explorer';
 import { isSelfCustody, signAndRelay } from '../../../lib/selfCustody';
-import { explorerAddress } from '../../../lib/explorer';
 
 export default function PoolDetailPage() {
   const params = useParams();
@@ -96,16 +98,18 @@ export default function PoolDetailPage() {
       await refreshUser();
       await load();
       const onChain = data?.onChain;
-      const contributeHash = onChain?.contributeHash;
-      const hash = contributeHash || onChain?.trustlineHash;
+      // Backend receipt uses `hash`/`explorer`; older clients used contributeHash*.
+      const contributeHash = onChain?.contributeHash || onChain?.hash || null;
+      const contributeExplorer = onChain?.contributeExplorer || onChain?.explorer || null;
+      const trustlineHash = onChain?.trustlineHash || null;
       const raised = Number(data.raisedUsdc).toLocaleString('es-AR');
       const unit = data?.dossier?.paymentKind === 'SOL' ? 'SOL' : 'USDC';
       if (contributeHash) {
-        setLastHash({ kind: 'contribute', hash: contributeHash, explorer: onChain?.contributeExplorer });
+        setLastHash({ kind: 'contribute', hash: contributeHash, explorer: contributeExplorer });
         setNotice(t('market.subscribedContributeHash', { n: raised, u: unit, hash: contributeHash }));
-      } else if (hash) {
-        setLastHash({ kind: 'trustline', hash, explorer: onChain?.trustlineExplorer });
-        setNotice(t('market.subscribedHash', { n: raised, hash }));
+      } else if (trustlineHash) {
+        setLastHash({ kind: 'trustline', hash: trustlineHash, explorer: onChain?.trustlineExplorer });
+        setNotice(t('market.subscribedHash', { n: raised, hash: trustlineHash }));
       } else if (onChainLive) {
         setNotice(t('market.subscribedRaisedSol', { n: raised, u: unit }));
       } else {
@@ -183,6 +187,8 @@ export default function PoolDetailPage() {
     // vs. units that exist only in the platform ledger and can still be sent.
     const onChainUnits = Number(holding?.tokensOnChain || 0);
     const pendingOnChain = Math.max(0, Number(holding?.tokens || 0) - onChainUnits);
+    const kycOk = !isKycRequired() || user?.kycStatus === 'APPROVED';
+    const canApproveAta = Boolean(user && kycOk && !user.trustlines?.includes(listing.id));
     const statusLabel = failed
       ? t('market.stateFailed')
       : success
@@ -196,6 +202,7 @@ export default function PoolDetailPage() {
       <div className="rounded-2xl border border-amber-300/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 mb-4">
         {t('market.honestyBanner')}
       </div>
+        <SoftKycNotice />
         <Link href="/mercado" className="inline-flex items-center gap-1.5 text-sm text-neutral-500">
           <ArrowLeft className="w-4 h-4" /> {t('market.back')}
         </Link>
@@ -314,7 +321,7 @@ export default function PoolDetailPage() {
                   )}
                 </div>
               )}
-              {user?.kycStatus === 'APPROVED' && !user?.trustlines?.includes(listing.id) && (
+              {canApproveAta && (
                 <button
                   type="button"
                   onClick={() => approveToken(listing.id).then(() => setNotice(t('market.approvedNotice'))).catch((e) => setNotice(e.message))}
@@ -334,7 +341,7 @@ export default function PoolDetailPage() {
                         .then((data: any) => {
                           const dist = data?.distribution;
                           if (dist?.hash) {
-                            setLastHash({ kind: 'distribute', hash: dist.hash, explorer: `https://explorer.solana.com/tx/${dist.hash}?cluster=devnet` });
+                            setLastHash({ kind: 'distribute', hash: dist.hash, explorer: explorerTx(dist.hash) });
                             setNotice(t('market.claimedOnChain', { hash: dist.hash }));
                           } else if (dist?.error) {
                             setNotice(`${t('market.claimedNotice')} ${dist.error}`);
@@ -377,7 +384,7 @@ export default function PoolDetailPage() {
                         distributeTokens(listing.id)
                           .then((data: any) => {
                             if (data?.hash) {
-                              setLastHash({ kind: 'distribute', hash: data.hash, explorer: `https://explorer.solana.com/tx/${data.hash}?cluster=devnet` });
+                              setLastHash({ kind: 'distribute', hash: data.hash, explorer: explorerTx(data.hash) });
                               setNotice(t('market.receivedOnChain', { n: Number(data.amount).toFixed(4), code: d.tokenTicker }));
                             } else {
                               setNotice(t('market.claimedNotice'));
@@ -414,16 +421,16 @@ export default function PoolDetailPage() {
                   {t('nav.orderbook')}
                 </Link>
               )}
-              {user?.kycStatus !== 'APPROVED' && (
+              {isKycRequired() && user?.kycStatus !== 'APPROVED' && (
                 <p className="text-sm text-neutral-600">
                   {t('market.kycOnly')}{' '}
-                  <Link href="/login" className="underline font-bold">{t('nav.login')}</Link>
+                  <Link href="/onboarding/kyc" className="underline font-bold">{t('kycSoft.cta')}</Link>
                 </p>
               )}
               <button
                 type="button"
                 onClick={invest}
-                disabled={busy || user?.kycStatus !== 'APPROVED' || listing.status !== 'LISTED'}
+                disabled={busy || !kycOk || listing.status !== 'LISTED'}
                 className="w-full py-3 rounded-2xl bg-black text-white font-display font-bold disabled:opacity-40"
               >
                 {busy ? '…' : sol ? t('market.contributeSol') : t('market.contribute')}
@@ -449,9 +456,10 @@ export default function PoolDetailPage() {
                   {t('market.contract')}
                 </a>
               )}
-              {listing.onChain?.contributeExplorer && (
+              {(listing.onChain?.contributeExplorer ||
+                ((listing.onChain?.contributeHash || listing.onChain?.hash) && listing.onChain?.explorer)) && (
                 <a
-                  href={listing.onChain.contributeExplorer}
+                  href={listing.onChain.contributeExplorer || listing.onChain.explorer}
                   target="_blank"
                   rel="noreferrer"
                   className="block text-xs font-mono underline break-all"

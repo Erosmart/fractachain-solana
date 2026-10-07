@@ -5,16 +5,14 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
-  // The demo used to live at the root; old links keep working.
+  // Legacy demo paths at the root. `/orderbook` is live now — do not redirect it.
   async redirects() {
-    return ['emision', 'licitaciones', 'orderbook', 'portfolio'].map((p) => ({
+    return ['emision', 'licitaciones', 'portfolio'].map((p) => ({
       source: `/${p}`,
       destination: `/demo/${p}`,
       permanent: false,
     }));
   },
 };
-
-module.exports = nextConfig;
 
 module.exports = nextConfig;

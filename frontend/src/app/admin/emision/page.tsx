@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { API_BASE_URL, bearerHeaders } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
 import { useI18n } from '../../../context/I18nContext';
+import { explorerTx } from '../../../lib/explorer';
 import Toast from '../../../components/Toast';
 import AdminGate from '../../../components/AdminGate';
 
@@ -380,7 +381,7 @@ function IssuanceInner() {
             {l.finalizeHash && (
               <p className="text-[11px] font-mono break-all">
                 finalize{' '}
-                <a href={`https://explorer.solana.com/tx/${l.finalizeHash}?cluster=devnet`} target="_blank" rel="noreferrer" className="underline">
+                <a href={explorerTx(l.finalizeHash)} target="_blank" rel="noreferrer" className="underline">
                   {l.finalizeHash}
                 </a>
               </p>

@@ -10,20 +10,46 @@ import {
 } from './program';
 import { fetchPlatform } from './offering_state';
 import { sendIxs } from './tx';
-import { usdcMintOrThrow } from './usdc';
+import { usdcMint, usdcMintOrThrow } from './usdc';
 
-/** One-time platform PDA init — the issuer-configuration tx of Solana. */
-export async function initializePlatformOnChain(opts?: { feeBps?: number; enforceKycHours?: boolean }) {
+/**
+ * Platform PDA bootstrap for Devnet ops.
+ *
+ * Safe to re-run: skips `initialize_platform` when the PDA already exists, and
+ * always applies `set_payment_mint` when `SOLANA_USDC_MINT` (or deployment
+ * usdcMint) is configured — so a bare first init without USDC can be fixed
+ * later without a one-off script.
+ */
+export async function initializePlatformOnChain(opts?: {
+  feeBps?: number;
+  enforceKycHours?: boolean;
+}) {
   const admin = adminKeypair();
-  const ixs = [ixInitializePlatform(admin.publicKey, opts?.feeBps ?? 0)];
+  const already = await isPlatformInitialized();
+  const ixs = [];
+
+  if (!already) {
+    ixs.push(ixInitializePlatform(admin.publicKey, opts?.feeBps ?? 0));
+  }
   if (opts?.enforceKycHours != null) {
     ixs.push(ixSetKycHours(admin.publicKey, opts.enforceKycHours));
   }
-  // Record the USDC payment mint so offerings default to it.
-  try {
-    ixs.push(ixSetPaymentMint(admin.publicKey, PaymentKind.Usdc, usdcMintOrThrow()));
-  } catch {
-    // No USDC mint configured yet — can be set later via setPaymentMintOnChain.
+
+  const mint = usdcMint();
+  if (mint) {
+    ixs.push(ixSetPaymentMint(admin.publicKey, PaymentKind.Usdc, mint));
+  } else if (!already) {
+    // First init without a mint leaves open_offering blocked until ops sets
+    // SOLANA_USDC_MINT and re-calls configure-issuer / set-payment-mint.
+    console.warn(
+      '[platform] initialized without USDC mint — call set-payment-mint after SOLANA_USDC_MINT is set',
+    );
+  }
+
+  if (ixs.length === 0) {
+    throw new Error(
+      'Platform already initialized and no USDC mint configured (set SOLANA_USDC_MINT)',
+    );
   }
   return sendIxs(admin, [], ixs);
 }
@@ -43,4 +69,9 @@ export async function setPaymentMintOnChain(kind: 'USDC' | 'USDT', mint: PublicK
   const admin = adminKeypair();
   const k = kind === 'USDT' ? PaymentKind.Usdt : PaymentKind.Usdc;
   return sendIxs(admin, [], [ixSetPaymentMint(admin.publicKey, k, mint)]);
+}
+
+/** Convenience: allowlist the configured cluster USDC mint on the platform PDA. */
+export async function setConfiguredUsdcMintOnChain() {
+  return setPaymentMintOnChain('USDC', usdcMintOrThrow());
 }

@@ -64,10 +64,15 @@ export async function receiptAfterContribute(
   extra?: { contributeHash?: string },
 ) {
   const snap = await fetchOffering(listingId).catch(() => null);
+  const contributeHash = extra?.contributeHash || null;
+  const explorer = explorerTx(contributeHash);
   return {
     ...(snap ? snapshotToApi(snap) : {}),
-    hash: extra?.contributeHash || null,
-    explorer: explorerTx(extra?.contributeHash),
+    hash: contributeHash,
+    explorer,
+    // Aliases kept for mercado list/detail UIs that read contributeHash*.
+    contributeHash,
+    contributeExplorer: explorer,
     wallet: wallet || null,
   };
 }
