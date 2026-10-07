@@ -2,10 +2,10 @@
 #   docker build -f frontend/Dockerfile --build-arg NEXT_PUBLIC_API_URL=http://localhost:8080 .
 # Railway: empty Root Directory, Dockerfile path = frontend/Dockerfile
 # NEXT_PUBLIC_* is baked in at build time — set the public backend URL as a build arg.
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+RUN npm ci || npm install
 COPY frontend/ ./
 RUN mkdir -p public
 ARG NEXT_PUBLIC_API_URL=http://localhost:8080
@@ -29,7 +29,7 @@ ENV NEXT_PUBLIC_FIREBASE_APP_ID=$NEXT_PUBLIC_FIREBASE_APP_ID
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000

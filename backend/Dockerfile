@@ -4,7 +4,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY backend/package.json backend/package-lock.json ./
-RUN npm ci
+RUN npm ci || npm install
 COPY backend/ ./
 RUN npm run build
 
@@ -16,7 +16,7 @@ RUN apk add --no-cache ca-certificates
 ENV NODE_ENV=production
 ENV PORT=8080
 COPY backend/package.json backend/package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev || npm install --omit=dev
 COPY --from=builder /app/dist ./dist
 # solana/connection.ts resolves deployments/ three levels above dist/solana/ → /deployments
 COPY --chown=node:node deployments/devnet.json /deployments/devnet.json
