@@ -8,7 +8,7 @@
  * (hard cap or deadline) and then credits every holder, so "reclamar" is a
  * retry and not a step the user has to discover.
  */
-import { addTrustline, claimListingTokens, listAccounts } from '../auth/accounts';
+import { addTrustline, claimListingTokens, listAccounts, markHoldingRefunded, markTokensOnChain } from '../auth/accounts';
 import {
   closeListing,
   getListing,
@@ -16,13 +16,15 @@ import {
   Listing,
   listListings,
   markListingClosed,
+  setListingMarket,
 } from '../admin/listings';
-import { finalizeOnChain } from '../solana/offering';
-import { fetchOffering } from '../solana/offering_state';
+import { distributeOnChain, finalizeOnChain, refundOnChain } from '../solana/offering';
+import { fetchOffering, listContributions, OfferingSnapshot } from '../solana/offering_state';
 import { adminKeypair } from '../solana/keys';
-import { unitsToUsdc } from '../solana/usdc';
+import { unitsToUsdc, usdcMint } from '../solana/usdc';
 import { explorerTx, listingChainMeta, snapshotToApi } from '../solana/onchain';
-import { distributeClaimedTokens, sdexAvailable } from './manifest_book';
+import { authorizeVault, createMarket, vaultAddress } from '../solana/manifest';
+import { PublicKey } from '@solana/web3.js';
 import { settlementAction } from './settlement_rules';
 
 const SWEEP_MS = Number(process.env.SETTLEMENT_SWEEP_MS || 60_000);
@@ -35,13 +37,9 @@ export type SettlementResult = {
 };
 
 /**
- * Credits the units of every contributor of a successful offering.
- *
- * The units already exist on chain since `contribute()`; what is pending is
- * the platform-ledger entry and, for listings with a Manifest market, the
- * ATA balance check that makes the position visible in a wallet. Self-custody
- * holders may still need to create their ATA, so their distribution is
- * reported as an error and retried from `/distribute`.
+ * Credits the units of every contributor of a successful offering —
+ * SANDBOX path only (listings without an Offering PDA). On-chain listings
+ * settle through `settleOnChainContributors`.
  */
 export async function settleHolders(listing: Listing): Promise<SettlementResult[]> {
   if (listing.status !== 'CLOSED_SUCCESS') return [];
@@ -55,24 +53,86 @@ export async function settleHolders(listing: Listing): Promise<SettlementResult[
     try {
       addTrustline(account.id, listing.id);
       claimListingTokens(account.id, listing.id, true);
+      markTokensOnChain(account.id, listing.id, owed);
     } catch (err: any) {
       results.push({ accountId: account.id, claimed: 0, error: err?.message || String(err) });
       continue;
     }
-
-    const result: SettlementResult = { accountId: account.id, claimed: owed };
-    if (sdexAvailable(listing)) {
-      try {
-        const paid = await distributeClaimedTokens({ listingId: listing.id, accountId: account.id });
-        result.distributedHash = paid.hash;
-      } catch (err: any) {
-        result.error = err?.message || String(err);
-      }
-    }
-    results.push(result);
+    results.push({ accountId: account.id, claimed: owed });
   }
 
   return results;
+}
+
+/**
+ * On-chain settlement — the crank half of the delayed-delivery model.
+ *
+ * Successful close: `distribute()` delivers the units to every Contribution
+ * PDA (the crank pays ATA rent, the holder never signs). Failed close:
+ * `refund()` returns each escrowed payment the same way. Per-contribution
+ * errors are collected, not thrown: one bad wallet must not strand the rest,
+ * and the next sweep retries whatever is still pending.
+ */
+export async function settleOnChainContributors(
+  listing: Listing,
+  snap: OfferingSnapshot,
+): Promise<SettlementResult[]> {
+  const admin = adminKeypair();
+  const contributions = await listContributions(listing.id);
+  const results: SettlementResult[] = [];
+
+  for (const c of contributions) {
+    const wallet = c.wallet;
+    const account = listAccounts().find((a) => a.publicKey === wallet.toBase58());
+    const tag = account?.id || wallet.toBase58().slice(0, 8);
+    try {
+      if (snap.state === 'Successful') {
+        const hash = await distributeOnChain(admin, listing.id, wallet);
+        if (account) {
+          try {
+            addTrustline(account.id, listing.id);
+            claimListingTokens(account.id, listing.id, true);
+            markTokensOnChain(account.id, listing.id, Number(c.units));
+          } catch (err: any) {
+            console.warn(`[settlement] ledger mark for ${tag}:`, err?.message || err);
+          }
+        }
+        results.push({ accountId: tag, claimed: Number(c.units), distributedHash: hash });
+      } else if (snap.state === 'Failed') {
+        const hash = await refundOnChain(admin, listing.id, wallet);
+        if (account) {
+          try {
+            markHoldingRefunded(account.id, listing.id, { hash });
+          } catch (err: any) {
+            console.warn(`[settlement] refund mark for ${tag}:`, err?.message || err);
+          }
+        }
+        results.push({ accountId: tag, claimed: 0, distributedHash: hash });
+      }
+    } catch (err: any) {
+      results.push({ accountId: tag, claimed: 0, error: err?.message || String(err) });
+    }
+  }
+  return results;
+}
+
+/**
+ * Opens the Manifest secondary market after a successful close — create the
+ * market account, thaw the frozen-by-default Token-2022 base vault, record
+ * the address on the listing. Idempotent (skipped if already set) and
+ * best-effort: settlement must not fail because the venue did.
+ */
+export async function openSecondaryMarket(listing: Listing): Promise<string | null> {
+  if (listing.manifestMarket) return listing.manifestMarket;
+  const snap = await fetchOffering(listing.id);
+  if (!snap || snap.state !== 'Successful') return null;
+  const quote = usdcMint();
+  if (!quote) throw new Error('Falta el mint USDC configurado');
+  const market = await createMarket(snap.rwaMint, quote);
+  const baseVault = await vaultAddress(new PublicKey(market.market), snap.rwaMint);
+  await authorizeVault(listing.id, baseVault);
+  setListingMarket(listing.id, market.market);
+  return market.market;
 }
 
 /**
@@ -98,19 +158,28 @@ export async function finalizeListedOffering(listingId: string) {
       finalizeHash: listing.finalizeHash,
       proceedsPaidTo: snap.fiduciary.toBase58(),
     });
+    const settlements = await settleOnChainContributors(updated, snap);
+    const marketAddress =
+      snap.state === 'Successful'
+        ? await openSecondaryMarket(getListing(listing.id)!).catch((err: any) => {
+            console.warn(`[settlement] market for ${listing.id}:`, err?.message || err);
+            return null;
+          })
+        : null;
     return {
-      ...updated,
-      settlements: await settleHolders(updated),
+      ...getListing(listing.id)!,
+      settlements,
       onChain: {
         ...listingChainMeta(updated),
         ...snapshotToApi(snap),
+        market: marketAddress,
         hash: listing.finalizeHash || null,
         explorer: explorerTx(listing.finalizeHash),
         alreadyClosed: true,
         note:
           snap.state === 'Successful'
-            ? `La emisión ya estaba Successful. Los USDC de devnet fueron a la wallet fiduciaria en finalize(); no hay un segundo payout al inversor.`
-            : `La emisión ya estaba Failed. El inversor puede llamar refund() para recuperar USDC.`,
+            ? `La emisión ya estaba Successful. distribute() entrega las unidades a cada contribuyente; los USDC de devnet ya fueron a la wallet fiduciaria.`
+            : `La emisión ya estaba Failed. refund() devuelve los USDC de cada contribuyente — el crank lo corre solo.`,
       },
     };
   }
@@ -128,18 +197,26 @@ export async function finalizeListedOffering(listingId: string) {
       proceedsPaidTo: snapAfter?.fiduciary.toBase58(),
     },
   );
+  const settlements = snapAfter ? await settleOnChainContributors(updated, snapAfter) : [];
+  const marketAddress = success
+    ? await openSecondaryMarket(getListing(listing.id)!).catch((err: any) => {
+        console.warn(`[settlement] market for ${listing.id}:`, err?.message || err);
+        return null;
+      })
+    : null;
   return {
-    ...updated,
-    settlements: await settleHolders(updated),
+    ...getListing(listing.id)!,
+    settlements,
     onChain: {
       ...listingChainMeta(updated),
       ...(snapAfter ? snapshotToApi(snapAfter) : {}),
+      market: marketAddress,
       hash: result,
       explorer: explorerTx(result),
       alreadyClosed: false,
       note: success
-        ? `finalize() pagó los USDC recaudados a la wallet fiduciaria (proceeds) y las unidades quedaron acreditadas al inversor. No hace falta reclamar nada.`
-        : `finalize() dejó Failed (no se llegó al soft cap). El inversor recupera USDC con refund().`,
+        ? `finalize() pagó los USDC a la wallet fiduciaria; distribute() entregó las unidades a cada contribuyente y el mercado secundario quedó abierto.`
+        : `finalize() dejó Failed (no se llegó al soft cap). refund() devolvió los USDC a cada contribuyente — nadie tuvo que reclamar.`,
     },
   };
 }

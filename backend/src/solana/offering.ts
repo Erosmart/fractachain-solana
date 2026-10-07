@@ -6,6 +6,7 @@ import {
   ataOf,
   ixContribute,
   ixCreateOffering,
+  ixDistribute,
   ixFinalize,
   ixMintSupply,
   ixOpenOffering,
@@ -154,26 +155,37 @@ export async function prepareRefundTx(listingId: string, contributor: PublicKey)
   const instruction = ixRefund(
     contributor,
     listingId,
+    contributor,
     usdcMintOrThrow(),
     paymentTokenProgram(),
   );
   return buildUnsignedTx(contributor, [instruction]);
 }
 
-export async function refundOnChainCustodial(listingId: string, contributor: Keypair) {
+/** Crank refund — `caller` signs and pays; `wallet` gets the escrow back. */
+export async function refundOnChain(caller: Keypair, listingId: string, wallet: PublicKey) {
   const instruction = ixRefund(
-    contributor.publicKey,
+    caller.publicKey,
     listingId,
+    wallet,
     usdcMintOrThrow(),
     paymentTokenProgram(),
   );
-  return sendIxs(contributor, [], [instruction]).catch((e) => {
+  return sendIxs(caller, [], [instruction]).catch((e) => {
     throw mapSolanaError(e);
   });
 }
 
 export async function submitRefundTx(signedTx: string) {
   return submitSignedTx(signedTx).catch((e) => {
+    throw mapSolanaError(e);
+  });
+}
+
+/** Crank distribute — delivers `wallet`'s units after a successful close. */
+export async function distributeOnChain(caller: Keypair, listingId: string, wallet: PublicKey) {
+  const instruction = ixDistribute(caller.publicKey, listingId, wallet);
+  return sendIxs(caller, [], [instruction]).catch((e) => {
     throw mapSolanaError(e);
   });
 }

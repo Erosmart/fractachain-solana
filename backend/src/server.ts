@@ -66,7 +66,7 @@ import {
   openOfferingOnChain,
   prepareContributeTx,
   prepareRefundTx,
-  refundOnChainCustodial,
+  refundOnChain,
   setFiduciaryOnChain,
   submitContributeTx,
   submitRefundTx,
@@ -96,6 +96,8 @@ import {
   openCustodialTrustline,
   distributeClaimedTokens,
   cancelCustodialOrder,
+  ensureCustodialSetup,
+  prepareTraderSetup,
   placeCustodialOrder,
   prepareCancel,
   prepareOrder,
@@ -893,7 +895,8 @@ app.post('/api/listings/:id/refund', (req: Request, res: Response) => {
     const before = account.publicKey
       ? await fetchContribution(listing.id, new PublicKey(account.publicKey)).catch(() => null)
       : null;
-    const hash = await refundOnChainCustodial(listing.id, custodialSigningKeypair(account.id));
+    const wallet = new PublicKey(account.publicKey!);
+    const hash = await refundOnChain(adminKeypair(), listing.id, wallet);
     const user = markHoldingRefunded(account.id, listing.id, { hash });
     return {
       user,
@@ -904,7 +907,7 @@ app.post('/api/listings/:id/refund', (req: Request, res: Response) => {
         ...live,
         hash,
         explorer: explorerTx(hash),
-        note: `refund() devolvió tus USDC de devnet a tu wallet y quemó las unidades RWA.`,
+        note: `refund() devolvió tus USDC de devnet a tu wallet.`,
       },
     };
   }, res);
@@ -972,7 +975,7 @@ app.post('/api/listings/:id/claim', (req: Request, res: Response) => {
         ? {
             ...listingChainMeta(listing),
             ...(snap ? snapshotToApi(snap) : {}),
-            note: 'Las unidades RWA ya existen en tu ATA desde contribute(); finalize() pagó a la empresa.',
+            note: 'Las unidades RWA se entregan en tu ATA al cierre exitoso con distribute(); finalize() pagó a la empresa.',
           }
         : undefined,
     };
@@ -1030,22 +1033,23 @@ app.post('/api/admin/testnet/configure-issuer', (req: Request, res: Response) =>
   }, res);
 });
 
-/** Creates the Manifest market for a listing and thaws its vault. */
+/**
+ * Creates the Manifest market for a listing and thaws its vault — only after
+ * a successful close (the program enforces the same gate on-chain).
+ */
 app.post('/api/listings/:id/market', (req: Request, res: Response) => {
   if (!requireAdmin(req, res)) return;
   wrapAsync(async () => {
     const listing = getListing(req.params.id);
     if (!listing) throw new Error('Listing no encontrado');
-    const [offeringPdaAddr] = (await import('./solana/pda')).offeringPda(listing.id);
-    const [rwaMint] = (await import('./solana/pda')).rwaMintPda(offeringPdaAddr);
-    const quote = usdcMint();
-    if (!quote) throw new Error('Falta el mint USDC configurado');
-    const market = await createMarket(rwaMint, quote);
-    if (market.market) {
-      await authorizeVault(listing.id, new PublicKey(market.market)).catch(() => undefined);
-      return setListingMarket(listing.id, market.market);
+    const snap = await fetchOffering(listing.id);
+    if (!snap) throw new Error('La licitación no tiene Offering PDA on-chain');
+    if (snap.state !== 'Successful') {
+      throw new Error('El mercado secundario abre solo si la licitación cerró con éxito');
     }
-    return listing;
+    const market = await createMarket(snap.rwaMint, snap.paymentMint);
+    await authorizeVault(listing.id, new PublicKey(market.baseVault));
+    return setListingMarket(listing.id, market.market);
   }, res);
 });
 
@@ -1166,7 +1170,7 @@ app.post('/api/listings/:id/refund/submit', (req: Request, res: Response) => {
         ...live,
         hash,
         explorer: explorerTx(hash),
-        note: 'refund() devolvió tus USDC de devnet a tu wallet y quemó las unidades RWA.',
+        note: 'refund() devolvió tus USDC de devnet a tu wallet.',
       },
     };
   }, res);
@@ -1214,6 +1218,24 @@ app.post('/api/orderbook/orders/:id/cancel', (req: Request, res: Response) => {
 app.get('/api/manifest/:listingId', (req: Request, res: Response) => {
   const account = getAccountByToken(req.headers.authorization);
   wrapAsync(() => getSdexBook(req.params.listingId, account?.id), res);
+});
+
+/**
+ * First-contact Manifest setup — creates the trader's wrapper + seat.
+ * Self-custody gets a partially-signed tx to co-sign; custodial executes it.
+ */
+app.post('/api/manifest/:listingId/setup', (req: Request, res: Response) => {
+  const account = getAccountByToken(req.headers.authorization);
+  if (!account) return res.status(401).json({ success: false, message: 'Iniciá sesión para operar' });
+  wrapAsync(async () => {
+    const params = { listingId: req.params.listingId, accountId: account.id };
+    if (account.custodyMode === 'CUSTODIAL') {
+      const hash = await ensureCustodialSetup(params);
+      return { ready: !hash, hash };
+    }
+    const prepared = await prepareTraderSetup(params);
+    return prepared ? { transaction: prepared.transaction, ready: false } : { ready: true };
+  }, res);
 });
 
 app.post('/api/manifest/:listingId/orders/prepare', (req: Request, res: Response) => {

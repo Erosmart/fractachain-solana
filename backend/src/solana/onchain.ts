@@ -2,6 +2,7 @@ import { PublicKey } from '@solana/web3.js';
 import { explorerAddress, explorerTx, getConnection, SOLANA_CLUSTER, SOLANA_RPC_URL } from './connection';
 import { isProgramDeployed, loadDeployment } from './deployment';
 import { adminPublicKey } from './keys';
+import { canFinalizeFromSnapshot, parseOfferingState } from './lifecycle_rules';
 import { fetchOffering, OfferingSnapshot } from './offering_state';
 import { programId } from './pda';
 import { usdcMint, unitsToUsdc } from './usdc';
@@ -45,6 +46,8 @@ export function listingChainMeta(listing?: { licitacionContract?: string | null 
   const offering = listing?.licitacionContract || null;
   return {
     contractId: offering,
+    /** The offering PDA exists on-chain — the UI can trust contract state. */
+    live: Boolean(offering),
     programId: programId().toBase58(),
     explorer: explorerAddress(offering),
     cluster: SOLANA_CLUSTER,
@@ -71,8 +74,18 @@ export async function receiptAfterContribute(
 
 /** Converts the on-chain snapshot to the API shape the frontend consumes. */
 export function snapshotToApi(snap: OfferingSnapshot) {
+  const fin = canFinalizeFromSnapshot({
+    state: parseOfferingState(snap.state),
+    raised: Number(snap.totalRaised),
+    hardCap: Number(snap.hardCap),
+    deadlineMs: Number(snap.deadline) * 1000,
+  });
   return {
     state: snap.state,
+    /** Alias kept for the market detail UI. */
+    stateName: snap.state,
+    canFinalize: fin.canFinalize,
+    finalizeReason: fin.reason,
     softCap: unitsToUsdc(snap.softCap),
     hardCap: unitsToUsdc(snap.hardCap),
     raised: unitsToUsdc(snap.totalRaised),

@@ -108,6 +108,12 @@ pub mod fractachain {
         instructions::lifecycle::finalize(ctx)
     }
 
+    /// Permissionless crank — delivers one contributor's units after a
+    /// successful close. The backend sweeps every Contribution PDA.
+    pub fn distribute(ctx: Context<Distribute>) -> Result<()> {
+        instructions::lifecycle::distribute(ctx)
+    }
+
     pub fn refund(ctx: Context<Refund>) -> Result<()> {
         instructions::lifecycle::refund(ctx)
     }

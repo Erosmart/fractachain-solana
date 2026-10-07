@@ -10,6 +10,7 @@
     "test": "node --use-system-ca ./node_modules/ts-node/dist/bin.js src/test_runner.ts"
   },
   "dependencies": {
+    "@cks-systems/manifest-sdk": "0.2.38",
     "@solana/spl-token": "^0.4.9",
     "@solana/web3.js": "^1.95.0",
     "bs58": "^6.0.0",

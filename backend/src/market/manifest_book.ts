@@ -13,24 +13,32 @@
 import { PublicKey } from '@solana/web3.js';
 import {
   createAssociatedTokenAccountInstruction,
-  getAccount as getTokenAccount,
   getAssociatedTokenAddressSync,
   TOKEN_2022_PROGRAM_ID,
 } from '@solana/spl-token';
-import { getListing, Listing } from '../admin/listings';
-import { custodialSigningKeypair, getAccount, markTokensOnChain } from '../auth/accounts';
-import { isSolanaPublicKey } from '../solana/keys';
+import { getListing, isOnChainListing, Listing } from '../admin/listings';
+import {
+  addTrustline,
+  claimListingTokens,
+  custodialSigningKeypair,
+  getAccount,
+  markTokensOnChain,
+} from '../auth/accounts';
+import { adminKeypair, isSolanaPublicKey } from '../solana/keys';
 import { getConnection } from '../solana/connection';
 import { offeringPda, rwaMintPda } from '../solana/pda';
-import { usdcAta, usdcBalance, usdcMint } from '../solana/usdc';
+import { usdcBalance, usdcMint } from '../solana/usdc';
 import {
   cancelOrderIxs,
   getBook,
   placeOrderIxs,
   traderOrders,
+  traderSetup,
 } from '../solana/manifest';
-import { buildUnsignedTx, sendIxs, submitSignedTx } from '../solana/tx';
+import { buildPartiallySignedTx, buildUnsignedTx, sendIxs, submitSignedTx } from '../solana/tx';
 import { isInvestorVerifiedOnChain } from '../solana/kyc';
+import { distributeOnChain } from '../solana/offering';
+import { fetchContribution } from '../solana/offering_state';
 import { loadTokenBalance } from '../auth/solana_devnet';
 
 /** The SPL mint every market quotes against (devnet mock or real USDC). */
@@ -129,25 +137,17 @@ async function loadManifestBook(listingId: string, accountId?: string): Promise<
   if (account?.publicKey && isSolanaPublicKey(account.publicKey)) {
     const wallet = new PublicKey(account.publicKey);
     const [orders, verified, ataBalance, usdcBal] = await Promise.all([
-      traderOrders(listing.manifestMarket!, wallet).catch(() => ({ bids: [], asks: [] })),
+      traderOrders(listing.manifestMarket!, wallet).catch(() => []),
       isInvestorVerifiedOnChain(wallet).catch(() => account.kycStatus === 'APPROVED'),
       loadTokenBalance(account.publicKey, base.toBase58(), true).catch(() => 0),
       usdcBalance(wallet).catch(() => 0),
     ]);
-    myOffers = [
-      ...orders.bids.map((o: any, i: number) => ({
-        id: String(o.clientOrderId ?? `bid-${i}`),
-        side: 'BUY' as const,
-        price: o.price,
-        amount: o.quantity,
-      })),
-      ...orders.asks.map((o: any, i: number) => ({
-        id: String(o.clientOrderId ?? `ask-${i}`),
-        side: 'SELL' as const,
-        price: o.price,
-        amount: o.quantity,
-      })),
-    ];
+    myOffers = orders.map((o) => ({
+      id: o.clientOrderId,
+      side: o.side === 'buy' ? ('BUY' as const) : ('SELL' as const),
+      price: o.price,
+      amount: o.quantity,
+    }));
     authorized = verified;
     const ata = getAssociatedTokenAddressSync(base, wallet, true, TOKEN_2022_PROGRAM_ID);
     needsTrustline = !(await getConnection().getAccountInfo(ata));
@@ -182,10 +182,60 @@ async function loadManifestBook(listingId: string, accountId?: string): Promise<
 
 export type Side = 'BUY' | 'SELL';
 
+function requireTradingAccount(params: { listingId: string; accountId: string }) {
+  const listing = requireMarketListing(params.listingId);
+  const account = getAccount(params.accountId);
+  if (!account?.publicKey || !isSolanaPublicKey(account.publicKey)) {
+    throw new Error('La cuenta no tiene wallet Solana asociada');
+  }
+  if (account.kycStatus !== 'APPROVED') {
+    throw new Error('Solo inversores con KYC aprobado pueden operar');
+  }
+  return { listing, account, wallet: new PublicKey(account.publicKey) };
+}
+
+/**
+ * First-contact setup: creates the trader's Manifest wrapper + seat. For
+ * self-custody the fresh wrapper keypair is generated server-side and the tx
+ * comes back partially signed — the wallet only adds its own signature.
+ * Returns null when the trader is already set up.
+ */
+export async function prepareTraderSetup(params: {
+  listingId: string;
+  accountId: string;
+}): Promise<{ transaction: string } | null> {
+  const { listing, wallet } = requireTradingAccount(params);
+  const setup = await traderSetup(listing.manifestMarket!, wallet);
+  if (!setup.setupNeeded) return null;
+  const transaction = await buildPartiallySignedTx(
+    wallet,
+    setup.instructions,
+    setup.wrapperKeypair ? [setup.wrapperKeypair] : [],
+  );
+  return { transaction };
+}
+
+/** Custodial counterpart — signs and submits the setup tx server-side. */
+export async function ensureCustodialSetup(params: {
+  listingId: string;
+  accountId: string;
+}): Promise<string | null> {
+  const { listing } = requireTradingAccount(params);
+  const signer = custodialSigningKeypair(params.accountId);
+  const setup = await traderSetup(listing.manifestMarket!, signer.publicKey);
+  if (!setup.setupNeeded) return null;
+  return sendIxs(
+    signer,
+    setup.wrapperKeypair ? [setup.wrapperKeypair] : [],
+    setup.instructions,
+  );
+}
+
 /**
  * Prepares an order for the investor to sign — returns a serialized unsigned
  * transaction (base64). The wallet signs it and posts it back through
- * `submitSignedTransaction`.
+ * `submitSignedTransaction`. Throws `NEEDS_SETUP` when the trader has no
+ * Manifest wrapper yet — run the setup flow first.
  */
 export async function prepareOrder(params: {
   listingId: string;
@@ -195,18 +245,13 @@ export async function prepareOrder(params: {
   quantity: number;
   clientOrderId?: bigint;
 }): Promise<{ transaction: string; summary: Record<string, unknown> }> {
-  const listing = requireMarketListing(params.listingId);
-  const account = getAccount(params.accountId);
-  if (!account?.publicKey || !isSolanaPublicKey(account.publicKey)) {
-    throw new Error('La cuenta no tiene wallet Solana asociada');
-  }
-  if (account.kycStatus !== 'APPROVED') {
-    throw new Error('Solo inversores con KYC aprobado pueden operar');
-  }
+  const { listing, wallet } = requireTradingAccount(params);
   if (params.price <= 0 || params.quantity <= 0) {
     throw new Error('Precio o cantidad inválidos');
   }
-  const wallet = new PublicKey(account.publicKey);
+
+  const setup = await traderSetup(listing.manifestMarket!, wallet);
+  if (setup.setupNeeded) throw new Error('NEEDS_SETUP');
 
   // Readable pre-check: selling without the ATA (or a frozen one) would fail
   // on-chain after the wallet already signed.
@@ -223,6 +268,7 @@ export async function prepareOrder(params: {
     side: params.side === 'BUY' ? 'buy' : 'sell',
     numBaseTokens: params.quantity,
     price: params.price,
+    clientOrderId: params.clientOrderId,
   });
   const transaction = await buildUnsignedTx(wallet, ixs);
   return {
@@ -246,11 +292,43 @@ export async function placeCustodialOrder(params: {
   side: Side;
   price: number;
   quantity: number;
+  clientOrderId?: bigint;
 }) {
-  const { transaction, summary } = await prepareOrder(params);
+  const { listing, wallet } = requireTradingAccount(params);
+  if (params.price <= 0 || params.quantity <= 0) {
+    throw new Error('Precio o cantidad inválidos');
+  }
+  await ensureCustodialSetup(params);
+  const base = listingAsset(listing);
+  const ata = getAssociatedTokenAddressSync(base, wallet, true, TOKEN_2022_PROGRAM_ID);
+  if (params.side === 'SELL' && !(await getConnection().getAccountInfo(ata))) {
+    throw new Error(`Primero creá la cuenta del token ${listing.dossier.tokenTicker} (ATA)`);
+  }
+  const clientOrderId = params.clientOrderId ?? BigInt(Date.now());
   const signer = custodialSigningKeypair(params.accountId);
-  const hash = await sendSignedPreparedTx(transaction, signer);
-  return { summary, hash, book: await getSdexBook(params.listingId, params.accountId) };
+  const ixs = await placeOrderIxs({
+    market: listing.manifestMarket!,
+    trader: signer.publicKey,
+    side: params.side === 'BUY' ? 'buy' : 'sell',
+    numBaseTokens: params.quantity,
+    price: params.price,
+    clientOrderId,
+  });
+  const hash = await sendIxs(signer, [], ixs);
+  return {
+    summary: {
+      side: params.side,
+      market: `${listing.dossier.tokenTicker}/USDC`,
+      marketAddress: listing.manifestMarket,
+      quantity: params.quantity,
+      price: params.price,
+      clientOrderId: String(clientOrderId),
+      estimatedTotal: Math.round(params.quantity * params.price * 1e6) / 1e6,
+      venue: 'Manifest CLOB',
+    },
+    hash,
+    book: await getSdexBook(params.listingId, params.accountId),
+  };
 }
 
 export async function prepareCancel(params: {
@@ -341,18 +419,39 @@ export async function openCustodialTrustline(params: { listingId: string; accoun
 }
 
 /**
- * On Solana the units land in the holder's ATA at `contribute()` time — there
- * is nothing extra to pay. This verifies the ATA balance covers the claimed
- * amount and records it for the portfolio view.
+ * Delivers this account's units on-chain (crank `distribute`) if its
+ * Contribution PDA is still pending, then verifies the ATA balance and marks
+ * the position on-chain for the portfolio view.
  */
 export async function distributeClaimedTokens(params: { listingId: string; accountId: string }) {
-  const listing = requireMarketListing(params.listingId);
+  const listing = getListing(params.listingId);
+  if (!listing) throw new Error('Mercado no encontrado');
+  if (!isOnChainListing(listing)) {
+    throw new Error('Esta licitación no tiene Offering PDA (sandbox)');
+  }
   const account = getAccount(params.accountId);
-  if (!account?.publicKey) throw new Error('La cuenta no tiene wallet Solana asociada');
-  const holding = (account.holdings || []).find((h) => h.listingId === params.listingId);
+  if (!account?.publicKey || !isSolanaPublicKey(account.publicKey)) {
+    throw new Error('La cuenta no tiene wallet Solana asociada');
+  }
+  // One-step claim: owed units move to claimed first — the ATA itself is
+  // created on-chain by the crank, no manual trustline step needed.
+  if ((account.holdings || []).some((h) => h.listingId === params.listingId && (h.tokensOwed || 0) > 0)) {
+    addTrustline(account.id, params.listingId);
+    claimListingTokens(account.id, params.listingId, true);
+  }
+  const holding = (getAccount(params.accountId)?.holdings || []).find(
+    (h) => h.listingId === params.listingId,
+  );
   const claimed = holding?.tokens || 0;
   if (!holding || claimed <= 0) {
     throw new Error('No hay tokens reclamados para distribuir');
+  }
+  const wallet = new PublicKey(account.publicKey);
+  let hash: string | null = null;
+  const contribution = await fetchContribution(listing.id, wallet).catch(() => null);
+  if (contribution && contribution.units > 0n) {
+    // The crank pays the ATA rent — works for custodial and self-custody.
+    hash = await distributeOnChain(adminKeypair(), listing.id, wallet);
   }
   const balance = await loadTokenBalance(account.publicKey, listingAsset(listing).toBase58(), true);
   if (balance + 1e-9 < claimed) {
@@ -361,7 +460,7 @@ export async function distributeClaimedTokens(params: { listingId: string; accou
     );
   }
   markTokensOnChain(account.id, params.listingId, claimed);
-  return { hash: null, tokensOnChain: claimed };
+  return { hash, tokensOnChain: claimed };
 }
 
 export async function submitSignedTransaction(signedTxBase64: string): Promise<string> {

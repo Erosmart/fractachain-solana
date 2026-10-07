@@ -73,7 +73,14 @@ pub fn thaw_holder(ctx: Context<Compliance>) -> Result<()> {
 /// this thaws the freshly-created vault (DefaultAccountState=Frozen) in the
 /// same market-bootstrap flow, before any deposit/order can hit a frozen
 /// account. Idempotent is not required — call once per vault.
+///
+/// Gated on a successful close: thawing the vault before settlement would
+/// open secondary trading on units that were never delivered.
 pub fn authorize_market_vault(ctx: Context<Compliance>) -> Result<()> {
+    require!(
+        ctx.accounts.offering.state == OfferingState::Successful,
+        FractachainError::MarketBeforeClose
+    );
     thaw(
         &ctx.accounts.token_account.to_account_info(),
         &ctx.accounts.rwa_mint.to_account_info(),

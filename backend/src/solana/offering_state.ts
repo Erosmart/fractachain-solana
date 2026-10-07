@@ -1,7 +1,7 @@
 import { PublicKey } from '@solana/web3.js';
 import { accountDiscriminator, Reader } from './borsh';
 import { getConnection } from './connection';
-import { offeringPda, investorPda, opaPda, contributionPda, platformPda } from './pda';
+import { offeringPda, investorPda, opaPda, contributionPda, platformPda, programId } from './pda';
 
 export type OfferingStateName =
   | 'Draft'
@@ -234,6 +234,33 @@ export async function fetchContribution(
   const info = await getConnection().getAccountInfo(pda);
   if (!info?.data?.length) return null;
   return decodeContribution(info.data as Buffer);
+}
+
+/**
+ * Every Contribution PDA of an offering — the settlement sweeper's work
+ * list. `settled` contributions (delivered units or closed accounts) drop
+ * out naturally once the crank consumes them.
+ */
+export async function listContributions(
+  listingId: string,
+): Promise<(ContributionSnapshot & { pda: PublicKey })[]> {
+  const [offering] = offeringPda(listingId);
+  const disc = accountDiscriminator('Contribution');
+  const accounts = await getConnection().getProgramAccounts(
+    programId(),
+    {
+      filters: [
+        { memcmp: { offset: 0, bytes: disc.toString('base64'), encoding: 'base64' } },
+        { memcmp: { offset: 8, bytes: offering.toBase58() } },
+      ],
+    },
+  );
+  return accounts
+    .map(({ pubkey, account }) => ({
+      ...decodeContribution(account.data as Buffer),
+      pda: pubkey,
+    }))
+    .filter((c) => c.amount > 0n || c.units > 0n);
 }
 
 export async function fetchPlatform(): Promise<PlatformSnapshot | null> {

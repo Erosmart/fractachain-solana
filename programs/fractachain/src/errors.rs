@@ -96,4 +96,8 @@ pub enum FractachainError {
     NothingToClaim,
     #[msg("Offering not terminated")]
     NotTerminated,
+    #[msg("Contribution already settled")]
+    NothingToDistribute,
+    #[msg("Secondary market opens only after a successful close")]
+    MarketBeforeClose,
 }

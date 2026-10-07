@@ -45,15 +45,20 @@ pub fn create_rwa_mint<'info>(
         uri: uri.clone(),
         additional_metadata: vec![],
     };
+    // The mint account must be exactly the size of the initialized
+    // extensions or initialize_mint2 rejects it (InvalidAccountData).
+    // TokenMetadata is variable-length: its initialize ix resizes the
+    // account itself, so its TLV blob is NOT counted here — but the account
+    // must already hold rent for the final, larger size.
     let space = ExtensionType::try_calculate_account_len::<spl_token_2022::state::Mint>(&[
         ExtensionType::DefaultAccountState,
         ExtensionType::PermanentDelegate,
         ExtensionType::MetadataPointer,
-        ExtensionType::TokenMetadata,
-    ])?
-    .checked_add(metadata.tlv_size_of().map_err(|_| error!(FractachainError::Overflow))?)
-    .unwrap();
-    let rent_lamports = Rent::get()?.minimum_balance(space);
+    ])?;
+    let final_space = space
+        .checked_add(metadata.tlv_size_of().map_err(|_| error!(FractachainError::Overflow))?)
+        .unwrap();
+    let rent_lamports = Rent::get()?.minimum_balance(final_space);
 
     // 1. Allocate the mint account (PDA signs its own creation).
     invoke_signed(
@@ -139,7 +144,7 @@ pub fn thaw<'info>(
 ) -> Result<()> {
     invoke_signed(
         &t22::thaw_account(
-            &spl_token_2022::ID,
+            &token_program.key(),
             &token_account.key(),
             &mint.key(),
             &offering.key(),
@@ -166,7 +171,7 @@ pub fn freeze<'info>(
 ) -> Result<()> {
     invoke_signed(
         &t22::freeze_account(
-            &spl_token_2022::ID,
+            &token_program.key(),
             &token_account.key(),
             &mint.key(),
             &offering.key(),
@@ -199,7 +204,7 @@ pub fn transfer_checked_signed<'info>(
 ) -> Result<()> {
     invoke_signed(
         &t22::transfer_checked(
-            &spl_token_2022::ID,
+            &token_program.key(),
             &from.key(),
             &mint.key(),
             &to.key(),
@@ -231,7 +236,7 @@ pub fn mint_to_offering<'info>(
 ) -> Result<()> {
     invoke_signed(
         &t22::mint_to(
-            &spl_token_2022::ID,
+            &token_program.key(),
             &mint.key(),
             &to.key(),
             &offering.key(),
@@ -261,7 +266,7 @@ pub fn burn_delegate<'info>(
 ) -> Result<()> {
     invoke_signed(
         &t22::burn_checked(
-            &spl_token_2022::ID,
+            &token_program.key(),
             &token_account.key(),
             &mint.key(),
             &offering.key(),
