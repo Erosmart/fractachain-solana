@@ -36,7 +36,6 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  revealedSecret: string | null;
   loginWithGoogle: () => Promise<User>;
   loginWithWallet: () => Promise<User>;
   loginWithEmail: (email: string, password: string, name?: string) => Promise<User>;
@@ -46,7 +45,6 @@ interface AuthContextType {
   approveToken: (listingId: string) => Promise<void>;
   claimTokens: (listingId: string) => Promise<any>;
   distributeTokens: (listingId: string) => Promise<any>;
-  fetchWalletSecret: () => Promise<string>;
   claimDividends: (listingId: string) => Promise<void>;
   finalizeOffering: (listingId: string) => Promise<any>;
   refundContribution: (listingId: string, selfCustody?: boolean) => Promise<any>;
@@ -58,7 +56,6 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   token: null,
   isLoading: true,
-  revealedSecret: null,
   loginWithGoogle: async () => {
     throw new Error('no session');
   },
@@ -74,7 +71,6 @@ const AuthContext = createContext<AuthContextType>({
   approveToken: async () => {},
   claimTokens: async () => {},
   distributeTokens: async () => {},
-  fetchWalletSecret: async () => '',
   claimDividends: async () => {},
   finalizeOffering: async () => ({}),
   refundContribution: async () => ({}),
@@ -115,7 +111,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
 
   const applySession = useCallback((nextToken: string, raw: any) => {
     const u = normalize(raw);
@@ -274,7 +269,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     const data = await res.json();
     if (!res.ok || !data.success) throw new Error(data.message || tClient('err.custodySave'));
-    if (data.secretOnce) setRevealedSecret(data.secretOnce);
     applySession(token, data.user);
     // Mismo post-paso que en login/link: custodial se resuelve en el backend,
     // self-custody firma la creación de la ATA en la wallet una sola vez.
@@ -342,16 +336,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data.data;
   }, [token, refreshUser]);
 
-  const fetchWalletSecret = useCallback(async () => {
-    if (!token) throw new Error(tClient('err.signIn'));
-    const res = await fetch(`${API_BASE_URL}/api/auth/wallet/secret`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.message || tClient('err.secretFail'));
-    return String(data.secret || '');
-  }, [token]);
-
   const finalizeOffering = useCallback(async (listingId: string) => {
     if (!token) throw new Error(tClient('err.signIn'));
     const res = await fetch(`${API_BASE_URL}/api/listings/${listingId}/finalize`, {
@@ -399,7 +383,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void import('../lib/firebase').then((m) => m.logoutFromFirebase()).catch(() => undefined);
     setUser(null);
     setToken(null);
-    setRevealedSecret(null);
     localStorage.removeItem('fc_auth_token');
     localStorage.removeItem('fc_auth_user');
   }, []);
@@ -409,7 +392,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       token,
       isLoading,
-      revealedSecret,
       loginWithGoogle,
       loginWithWallet,
       loginWithEmail,
@@ -419,7 +401,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       approveToken,
       claimTokens,
       distributeTokens,
-      fetchWalletSecret,
       claimDividends,
       finalizeOffering,
       refundContribution,
@@ -430,7 +411,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       token,
       isLoading,
-      revealedSecret,
       loginWithGoogle,
       loginWithWallet,
       loginWithEmail,
@@ -440,7 +420,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       approveToken,
       claimTokens,
       distributeTokens,
-      fetchWalletSecret,
       claimDividends,
       finalizeOffering,
       refundContribution,

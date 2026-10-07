@@ -130,7 +130,6 @@ import {
   readSelfie,
   revokeToken,
   setCustody,
-  custodialSigningKey,
   findAccountByPublicKey,
   setKycStatusByKycId,
   submitOnboardingKyc,
@@ -226,17 +225,7 @@ app.post('/api/auth/wallet', async (req: Request, res: Response) => {
     }
     const result = setCustody(account.id, mode, publicKey);
     const user = (await hydrateTestnetWallet(account.id)) || result.user;
-    res.json({ success: true, user, secretOnce: result.secretOnce });
-  } catch (err: any) {
-    res.status(400).json({ success: false, message: err.message });
-  }
-});
-
-app.get('/api/auth/wallet/secret', (req: Request, res: Response) => {
-  const account = getAccountByToken(req.headers.authorization);
-  if (!account) return res.status(401).json({ success: false, message: 'No autenticado' });
-  try {
-    res.json({ success: true, secret: custodialSigningKey(account.id) });
+    res.json({ success: true, user });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
   }

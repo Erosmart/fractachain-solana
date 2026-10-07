@@ -394,28 +394,23 @@ if (accounts.size) save();
 export function setCustody(accountId: string, mode: 'CUSTODIAL' | 'SELF', externalPublicKey?: string) {
   const account = accounts.get(accountId);
   if (!account) throw new Error('Cuenta no encontrada');
-  if (account.custodyMode) {
-    return { user: toPublic(account), secretOnce: undefined as string | undefined };
-  }
-  if (mode === 'SELF' && externalPublicKey) {
+  if (account.custodyMode) return { user: toPublic(account) };
+  if (mode === 'SELF') {
+    if (!externalPublicKey) throw new Error('Self-custody requiere publicKey');
     if (!isSolanaPublicKey(externalPublicKey)) throw new Error('Public key Solana inválida');
     account.custodyMode = 'SELF';
     account.publicKey = externalPublicKey;
     account.authProvider = account.authProvider || 'wallet';
     save();
-    return { user: toPublic(account), secretOnce: undefined as string | undefined };
+    return { user: toPublic(account) };
   }
   const keys = randomKeypair();
   account.custodyMode = mode;
   account.publicKey = keys.publicKey;
-  if (mode === 'CUSTODIAL') {
-    account.secretKey = sealSecret(keys.secretKey);
-    account.recoveryHint = 'custodia-fractachain';
-    save();
-    return { user: toPublic(account), secretOnce: undefined as string | undefined };
-  }
+  account.secretKey = sealSecret(keys.secretKey);
+  account.recoveryHint = 'custodia-fractachain';
   save();
-  return { user: toPublic(account), secretOnce: keys.secretKey };
+  return { user: toPublic(account) };
 }
 
 /**
