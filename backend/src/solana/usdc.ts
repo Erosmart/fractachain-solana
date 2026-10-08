@@ -7,7 +7,7 @@ import {
 } from '@solana/spl-token';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { getConnection, isLocalCluster, SOLANA_CLUSTER } from './connection';
-import { adminKeypair, isSolanaPublicKey, usdcMintAuthority } from './keys';
+import { adminKeypair, hasAdminSecret, isSolanaPublicKey, usdcMintAuthority } from './keys';
 import { loadDeployment } from './deployment';
 import { ataOf } from './program';
 
@@ -92,6 +92,9 @@ export async function mintDemoUsdc(owner: PublicKey, amountUsdc: number): Promis
   }
   const mint = usdcMintOrThrow();
   const authority = usdcMintAuthority();
+  // The mint authority keypair may hold no SOL — the admin wallet (deployed
+  // and funded) pays fees and the ATA rent instead.
+  const payer = hasAdminSecret() ? adminKeypair() : authority;
   const ata = getAssociatedTokenAddressSync(mint, owner, true, TOKEN_PROGRAM_ID);
   const conn = getConnection();
   const ix = createMintToInstruction(
@@ -112,12 +115,13 @@ export async function mintDemoUsdc(owner: PublicKey, amountUsdc: number): Promis
     ataExists = false;
   }
   if (!ataExists) {
-    tx.add(buildCreateUsdcAtaIx(owner, authority.publicKey));
+    tx.add(buildCreateUsdcAtaIx(owner, payer.publicKey));
   }
   tx.add(ix);
-  tx.feePayer = authority.publicKey;
+  tx.feePayer = payer.publicKey;
   tx.recentBlockhash = (await conn.getLatestBlockhash()).blockhash;
-  tx.sign(authority);
+  const signers = payer.publicKey.equals(authority.publicKey) ? [payer] : [payer, authority];
+  tx.sign(...signers);
   const sig = await conn.sendRawTransaction(tx.serialize());
   await conn.confirmTransaction(sig);
   return sig;

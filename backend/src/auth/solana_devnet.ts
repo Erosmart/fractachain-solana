@@ -1,5 +1,6 @@
 import { PublicKey } from '@solana/web3.js';
 import { autoFaucetEnabled, getConnection } from '../solana/connection';
+import { ensureSolBalance } from '../solana/devnet';
 import { createSolanaKeypair, isSolanaPublicKey } from '../solana/keys';
 import { usdcBalance, solBalance } from '../solana/usdc';
 import { getAccount, getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
@@ -22,10 +23,8 @@ export function createWalletKeypair(): { publicKey: string; secretKey: string } 
 export async function requestDevnetAirdrop(publicKey: string, sol = 0.5): Promise<boolean> {
   if (!autoFaucetEnabled()) return false;
   try {
-    const conn = getConnection();
-    const sig = await conn.requestAirdrop(new PublicKey(publicKey), Math.round(sol * 1e9));
-    await conn.confirmTransaction(sig, 'confirmed');
-    return true;
+    const { airdropped } = await ensureSolBalance(new PublicKey(publicKey));
+    return airdropped;
   } catch {
     return false;
   }
