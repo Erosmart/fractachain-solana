@@ -15,6 +15,22 @@ import { offeringPda, rwaMintPda } from './pda';
 import { mapSolanaError, sendIxs } from './tx';
 import { fetchInvestor } from './offering_state';
 
+export type InvestorTypeName = 'National' | 'Foreign' | 'Qualified' | 'Institutional';
+
+export function investorTypeFromName(name?: InvestorTypeName | string | null): InvestorType {
+  switch (name) {
+    case 'Foreign':
+      return InvestorType.Foreign;
+    case 'Qualified':
+      return InvestorType.Qualified;
+    case 'Institutional':
+      return InvestorType.Institutional;
+    case 'National':
+    default:
+      return InvestorType.National;
+  }
+}
+
 /**
  * Approves an investor on-chain — the Investor PDA doubles as the platform-
  * wide KYC record; every offering reads it.
@@ -23,9 +39,12 @@ export async function verifyInvestorOnChain(
   wallet: PublicKey,
   countryCode = 32,
   expiry?: bigint,
+  investorType: InvestorType | InvestorTypeName = InvestorType.National,
 ): Promise<string> {
   const admin = adminKeypair();
   const expiryTs = expiry ?? BigInt(Math.floor(Date.now() / 1000) + 365 * 86400);
+  const type =
+    typeof investorType === 'string' ? investorTypeFromName(investorType) : investorType;
   return sendIxs(
     admin,
     [],
@@ -34,7 +53,7 @@ export async function verifyInvestorOnChain(
         admin.publicKey,
         wallet,
         countryCode,
-        InvestorType.National,
+        type,
         expiryTs,
       ),
     ],
@@ -55,6 +74,19 @@ export async function ensureInvestorVerifiedForOps(wallet: PublicKey): Promise<v
   if (await isInvestorVerifiedOnChain(wallet)) return;
   if (isKycEnforced()) {
     throw new Error('KYC on-chain requerido: el inversor no está verificado');
+  }
+  await verifyInvestorOnChain(wallet);
+}
+
+/**
+ * `distribute` needs an Investor account (PDA constraint) but allows expired /
+ * revoked KYC — units deliver frozen. Do not re-run verify or require live KYC.
+ */
+export async function ensureInvestorPdaForDistribute(wallet: PublicKey): Promise<void> {
+  const snap = await fetchInvestor(wallet).catch(() => null);
+  if (snap) return;
+  if (isKycEnforced()) {
+    throw new Error('Investor PDA requerido para distribute (KYC on-chain ausente)');
   }
   await verifyInvestorOnChain(wallet);
 }

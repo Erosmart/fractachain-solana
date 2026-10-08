@@ -379,16 +379,19 @@ export function ixCheckThreshold(
   crank: PublicKey,
   listingId: string,
   holder: PublicKey,
-  rwaMint: PublicKey,
+  /** Optional override; defaults to the Offering's derived RWA mint PDA. */
+  rwaMint?: PublicKey,
 ) {
   const [offering] = offeringPda(listingId);
+  const [derivedMint] = rwaMintPda(offering);
+  const mint = rwaMint || derivedMint;
   const [investor] = investorPda(holder);
   const [opa] = opaPda(offering);
   return ix('check_threshold', [
     meta(crank, { mut: true, signer: true }),
     meta(investor, { mut: true }),
     meta(offering),
-    meta(ataOf(holder, rwaMint, TOKEN_2022_PROGRAM_ID)),
+    meta(ataOf(holder, mint, TOKEN_2022_PROGRAM_ID)),
     meta(opa, { mut: true }),
     meta(SystemProgram.programId),
   ]);

@@ -76,21 +76,26 @@ import {
 import { fetchOffering, fetchContribution } from './solana/offering_state';
 import { snapshotToApi } from './solana/onchain';
 import { usdcToUnits, unitsToUsdc, usdcMint, mintDemoUsdc, buildCreateUsdcAtaIx } from './solana/usdc';
-import { createMarket, authorizeVault } from './solana/manifest';
 import {
   initializePlatformOnChain,
   setConfiguredUsdcMintOnChain,
   setPaymentMintOnChain,
 } from './solana/platform';
-import { ensureInvestorVerifiedForOps, setHolderFrozenOnChain, verifyInvestorOnChain } from './solana/kyc';
+import {
+  ensureInvestorVerifiedForOps,
+  revokeInvestorOnChain,
+  setHolderFrozenOnChain,
+  verifyInvestorOnChain,
+} from './solana/kyc';
 import { isKycEnforced, SOLANA_CLUSTER } from './solana/connection';
 import { buildUnsignedTx, submitSignedTx } from './solana/tx';
 import { PublicKey } from '@solana/web3.js';
-import { setListingMarket } from './admin/listings';
 import { cancelOrder, getBook, listMarkets, placeOrder } from './market/orderbook';
 import {
   autoFinalizeIfDue,
   finalizeListedOffering,
+  openSecondaryMarket,
+  settleOnChainContributors,
   settleHolders,
   startSettlementSweep,
 } from './market/settlement';
@@ -111,7 +116,6 @@ import {
 } from './market/manifest_book';
 import { ensureWalletFunded } from './solana/wallet_funding';
 import { loadSolBalance, loadUsdcBalance } from './auth/solana_devnet';
-import { custodialSigningKeypair } from './auth/accounts';
 import { getTestnetConfig, setTestnetConfig } from './admin/testnet';
 import { isProgramDeployed, loadDeployment } from './solana/deployment';
 import { getOnChainStatus, listingChainMeta, receiptAfterContribute, explorerTx } from './solana/onchain';
@@ -130,7 +134,9 @@ import {
   addTrustline,
   claimListingTokens,
   claimPendingDividend,
+  custodialSigningKeypair,
   markHoldingRefunded,
+  getAccount,
   getAccountByToken,
   hydrateTestnetWallet,
   isAdminAccount,
@@ -686,25 +692,41 @@ function onChainListingOr404(listingId: string) {
 /** `refund()` only exists once `finalize()` left the offering in Failed. */
 async function requireFailedOffering(listing: Listing, investor?: string) {
   const snap = await fetchOffering(listing.id);
-  const apiSnap = snap ? snapshotToApi(snap) : null;
-  if (snap?.state !== 'Failed' && listing.status !== 'CLOSED_FAILED') {
+  if (!snap) {
+    throw new Error('No se pudo leer el Offering on-chain; reintentá el refund');
+  }
+  if (snap.state !== 'Failed') {
+    // Never trust listing.status alone — a false CLOSED_FAILED would enable
+    // refund against Successful and fail with NotFailed on-chain.
     throw new Error('refund() solo corre si finalize() dejó la emisión en Failed');
   }
-  return apiSnap || { state: 'Failed' };
+  return snapshotToApi(snap);
 }
 
 async function listingPayload(listingId: string, investor?: string) {
   const listing = getListing(listingId);
   if (!listing) return null;
-  const snap = isOnChainListing(listing) ? await fetchOffering(listing.id).catch(() => null) : null;
+  const onChain = isOnChainListing(listing);
+  const snap = onChain ? await fetchOffering(listing.id).catch(() => null) : null;
   let current = listing;
-  if (snap && (snap.state === 'Successful' || snap.state === 'Failed') && listing.status === 'LISTED') {
+  let settlements: unknown[] | null = null;
+  const closedOnChain =
+    snap && (snap.state === 'Successful' || snap.state === 'Failed');
+  if (closedOnChain && listing.status === 'LISTED') {
     current = markListingClosed(
       listing.id,
-      snap.state === 'Successful' ? 'CLOSED_SUCCESS' : 'CLOSED_FAILED',
-      unitsToUsdc(snap.totalRaised),
-      { proceedsPaidTo: snap.fiduciary.toBase58() },
+      snap!.state === 'Successful' ? 'CLOSED_SUCCESS' : 'CLOSED_FAILED',
+      unitsToUsdc(snap!.totalRaised),
+      { proceedsPaidTo: snap!.fiduciary.toBase58() },
     );
+  }
+  // Retry distribute/refund even when already CLOSED_* (partial crank failures).
+  if (onChain && closedOnChain) {
+    settlements = await settleOnChainContributors(current, snap!).catch((err) => {
+      console.warn(`[listingPayload] settle on-chain ${listing.id}:`, err?.message || err);
+      return [{ error: err?.message || String(err) }];
+    });
+  } else if (!onChain && current.status === 'CLOSED_SUCCESS') {
     await settleHolders(current).catch(() => []);
   }
   return {
@@ -716,6 +738,7 @@ async function listingPayload(listingId: string, investor?: string) {
       hash: current.finalizeHash || null,
       explorer: current.finalizeHash ? explorerTx(current.finalizeHash) : listingChainMeta(current).explorer,
       finalizeExplorer: explorerTx(current.finalizeHash),
+      settlements,
     },
   };
 }
@@ -954,6 +977,9 @@ app.post('/api/listings/:id/trustline', (req: Request, res: Response) => {
     }
     // Thaw the holder's ATA so transfers accept it — admin-signed compliance.
     // Devnet: allow without form KYC (Investor PDA is auto-verified when needed).
+    // Surface thawError when the ATA does not exist yet (distribute creates it).
+    let thawHash: string | null = null;
+    let thawError: string | null = null;
     if (
       listing &&
       isOnChainListing(listing) &&
@@ -964,11 +990,14 @@ app.post('/api/listings/:id/trustline', (req: Request, res: Response) => {
       await ensureInvestorVerifiedForOps(wallet).catch((e) =>
         console.warn('[kyc-auto]', e?.message || e),
       );
-      await setHolderFrozenOnChain(listing.id, wallet, false).catch(
-        (e) => console.warn('[thaw]', e?.message || e),
-      );
+      try {
+        thawHash = await setHolderFrozenOnChain(listing.id, wallet, false);
+      } catch (e: any) {
+        thawError = e?.message || String(e);
+        console.warn('[thaw]', thawError);
+      }
     }
-    return user;
+    return { ...user, thawHash, thawError };
   }, res);
 });
 
@@ -977,27 +1006,27 @@ app.post('/api/listings/:id/claim', (req: Request, res: Response) => {
   if (!account) return res.status(401).json({ success: false, message: 'Iniciá sesión' });
   wrapAsync(async () => {
     const listing = getListing(req.params.id);
+    // On-chain: crank distribute first (throws on failure) so ledger claim
+    // does not clear tokensOwed while the ATA is still empty.
+    if (listing && isOnChainListing(listing)) {
+      const distribution = await distributeClaimedTokens({
+        listingId: listing.id,
+        accountId: account.id,
+      });
+      const snap = await fetchOffering(listing.id).catch(() => null);
+      const user = getAccount(account.id);
+      return {
+        ...(user ? toPublic(user) : {}),
+        distribution,
+        onChain: {
+          ...listingChainMeta(listing),
+          ...(snap ? snapshotToApi(snap) : {}),
+          note: 'Las unidades RWA se entregan en tu ATA al cierre exitoso con distribute(); finalize() pagó a la empresa.',
+        },
+      };
+    }
     const user = claimListingTokens(account.id, req.params.id, listing?.status === 'CLOSED_SUCCESS');
-    const snap = listing && isOnChainListing(listing) ? await fetchOffering(listing.id).catch(() => null) : null;
-    // For on-chain listings the units already sit in the holder's ATA; the
-    // distribution check just verifies the balance matches.
-    const distribution =
-      listing && sdexAvailable(listing)
-        ? await distributeClaimedTokens({ listingId: listing.id, accountId: account.id }).catch(
-            (e: any) => ({ error: e?.message || 'error' }),
-          )
-        : null;
-    return {
-      ...user,
-      distribution,
-      onChain: listing
-        ? {
-            ...listingChainMeta(listing),
-            ...(snap ? snapshotToApi(snap) : {}),
-            note: 'Las unidades RWA se entregan en tu ATA al cierre exitoso con distribute(); finalize() pagó a la empresa.',
-          }
-        : undefined,
-    };
+    return { ...user, distribution: null };
   }, res);
 });
 
@@ -1081,14 +1110,12 @@ app.post('/api/listings/:id/market', (req: Request, res: Response) => {
   wrapAsync(async () => {
     const listing = getListing(req.params.id);
     if (!listing) throw new Error('Listing no encontrado');
-    const snap = await fetchOffering(listing.id);
-    if (!snap) throw new Error('La licitación no tiene Offering PDA on-chain');
-    if (snap.state !== 'Successful') {
+    // Idempotent: persist market before thaw; retry authorize if market exists.
+    const marketAddr = await openSecondaryMarket(listing);
+    if (!marketAddr) {
       throw new Error('El mercado secundario abre solo si la licitación cerró con éxito');
     }
-    const market = await createMarket(snap.rwaMint, snap.paymentMint);
-    await authorizeVault(listing.id, new PublicKey(market.baseVault));
-    return setListingMarket(listing.id, market.market);
+    return getListing(listing.id);
   }, res);
 });
 
@@ -1158,12 +1185,23 @@ app.post('/api/listings/:id/contribute/submit', (req: Request, res: Response) =>
   if (!signedTx) return res.status(400).json({ success: false, message: 'Falta la transacción firmada' });
   wrapAsync(async () => {
     const listing = onChainListingOr404(req.params.id);
-    const amount = Number(req.body?.usdcAmount);
+    if (!account.publicKey) throw new Error('La cuenta no tiene wallet Solana asociada');
     const hash = await submitContributeTx(signedTx);
+    const wallet = new PublicKey(account.publicKey);
+    // Ledger must mirror the Contribution PDA, not a client-supplied usdcAmount.
+    const contrib = await fetchContribution(listing.id, wallet).catch(() => null);
     const snap = await fetchOffering(listing.id).catch(() => null);
+    const amount = contrib
+      ? unitsToUsdc(contrib.amount)
+      : Number(req.body?.usdcAmount);
+    const tokens = contrib
+      ? Number(contrib.units)
+      : listing.dossier.pricePerShareUsdc > 0
+        ? amount / listing.dossier.pricePerShareUsdc
+        : 0;
     recordOnChainContribution(listing.id, account.id, {
       amount,
-      tokens: listing.dossier.pricePerShareUsdc > 0 ? amount / listing.dossier.pricePerShareUsdc : 0,
+      tokens,
       raised: snap ? unitsToUsdc(snap.totalRaised) : amount,
     });
     const onChain = await receiptAfterContribute(listing.id, account.id, {
@@ -1364,13 +1402,18 @@ app.post('/api/solana/submit', (req: Request, res: Response) => {
 app.post('/api/listings/:id/proceeds-wallet', (req: Request, res: Response) => {
   if (!requireAdmin(req, res)) return;
   wrapAsync(async () => {
-    const listing = setListingProceedsWallet(req.params.id, String(req.body?.wallet || ''));
-    // Before the offering opens the wallet goes straight into `open_offering`.
-    const fiduciary =
-      listing.status === 'LISTED' && isOnChainListing(listing)
-        ? await setFiduciaryOnChain(listing.id, new PublicKey(listing.dossier.proceedsWallet))
-        : null;
-    return { ...listing, fiduciary };
+    const listing = getListing(req.params.id);
+    if (!listing) throw new Error('Listing no encontrado');
+    const wallet = String(req.body?.wallet || '').trim();
+    // When LISTED on-chain, set_fiduciary first so a failed RPC cannot leave
+    // the dossier pointing at a wallet finalize() will not pay.
+    let fiduciary: string | null = null;
+    if (listing.status === 'LISTED' && isOnChainListing(listing)) {
+      if (!wallet) throw new Error('Falta la wallet de cobro');
+      fiduciary = await setFiduciaryOnChain(listing.id, new PublicKey(wallet));
+    }
+    const updated = setListingProceedsWallet(req.params.id, wallet);
+    return { ...updated, fiduciary };
   }, res);
 });
 
@@ -1421,10 +1464,12 @@ app.post('/api/admin/compliance/sync', (req: Request, res: Response) => {
   if (!address) return res.status(400).json({ success: false, message: 'Falta la dirección' });
   wrapAsync(async () => {
     const wallet = new PublicKey(address);
+    // approved:false must revoke the Investor PDA — freezing one ATA alone
+    // leaves contribute/OPA open via is_investor_verified.
     const kycHash = approved
       ? await verifyInvestorOnChain(wallet)
-      : null;
-    const results: Record<string, unknown> = { kycHash };
+      : await revokeInvestorOnChain(wallet);
+    const results: Record<string, unknown> = { kycHash, revoked: !approved };
     if (listingId) {
       const listing = getListing(listingId);
       if (listing && isOnChainListing(listing)) {

@@ -512,7 +512,12 @@ export function submitOnboardingKyc(
       .then(async ({ verifyInvestorOnChain }) => {
         await verifyInvestorOnChain(new (await import('@solana/web3.js')).PublicKey(account.publicKey));
       })
-      .catch(() => {});
+      .catch((err) =>
+        console.warn(
+          `[kyc] auto verify_investor failed for ${account.publicKey}:`,
+          (err as Error)?.message || err,
+        ),
+      );
   }
   return toPublic(account);
 }
