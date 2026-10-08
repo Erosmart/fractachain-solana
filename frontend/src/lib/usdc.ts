@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, parseApiJson } from './api';
 import { solanaSignTransaction } from './solanaWallet';
 
 export interface UsdcFundResult {
@@ -21,7 +21,7 @@ export async function ensureUsdcReady(token: string): Promise<UsdcFundResult> {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: '{}',
   });
-  const json = await res.json();
+  const json = await parseApiJson<{ success?: boolean; message?: string; data?: UsdcFundResult }>(res);
   if (!res.ok || json.success === false) throw new Error(json.message || 'usdc fund failed');
   let data = json.data as UsdcFundResult;
   if (data?.status === 'NEED_TRUSTLINE' && data.transaction) {
@@ -31,7 +31,7 @@ export async function ensureUsdcReady(token: string): Promise<UsdcFundResult> {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ transaction: signed }),
     });
-    const json2 = await res2.json();
+    const json2 = await parseApiJson<{ success?: boolean; message?: string }>(res2);
     if (!res2.ok || json2.success === false) throw new Error(json2.message || 'usdc submit failed');
     // Relayed the ATA creation — retry the grant now that the account exists.
     const res3 = await fetch(`${API_BASE_URL}/api/wallet/usdc/fund`, {
@@ -39,9 +39,9 @@ export async function ensureUsdcReady(token: string): Promise<UsdcFundResult> {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: '{}',
     });
-    const json3 = await res3.json();
+    const json3 = await parseApiJson<{ success?: boolean; message?: string; data?: UsdcFundResult }>(res3);
     if (!res3.ok || json3.success === false) throw new Error(json3.message || 'usdc grant failed');
-    data = json3.data;
+    data = json3.data as UsdcFundResult;
   }
   return data;
 }

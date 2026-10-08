@@ -6,6 +6,7 @@ import OnboardingStep from '../../../components/OnboardingStep';
 import WalletPicker from '../../../components/WalletPicker';
 import { useAuth } from '../../../context/AuthContext';
 import { useI18n } from '../../../context/I18nContext';
+import { isDevnetSoftKyc } from '../../../lib/devnetMode';
 
 export default function WalletOnboardingPage() {
   const { chooseCustody, linkSolanaWallet } = useAuth();
@@ -29,7 +30,14 @@ export default function WalletOnboardingPage() {
   return (
     <OnboardingStep path="/onboarding/wallet">
       <h1 className="font-serif italic text-3xl sm:text-4xl">{t('acct.custodyTitle')}</h1>
-      <p className="mt-2 text-sm text-black/60">{t('acct.custodyLead')}</p>
+      <p className="mt-2 text-sm text-black/60">
+        {isDevnetSoftKyc() ? t('acct.custodyLeadDevnet') : t('acct.custodyLead')}
+      </p>
+      {isDevnetSoftKyc() && (
+        <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          {t('kycSoft.body')}
+        </p>
+      )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-brand-border bg-brand-card p-5 shadow-sm flex flex-col">

@@ -148,7 +148,10 @@ export interface OpaSnapshot {
 
 export function decodeOpa(data: Buffer): OpaSnapshot {
   const r = new Reader(data);
-  r.bytes(8);
+  const disc = r.bytes(8);
+  if (!disc.equals(accountDiscriminator('Opa'))) {
+    throw new Error('Not an Opa account');
+  }
   const states: OpaStateName[] = ['Triggered', 'ActiveOffer', 'SuspendedVotes', 'SqueezedOut'];
   const offering = r.pubkey();
   const state = states[r.u8()] ?? 'Triggered';
@@ -170,7 +173,10 @@ export interface ContributionSnapshot {
 
 export function decodeContribution(data: Buffer): ContributionSnapshot {
   const r = new Reader(data);
-  r.bytes(8);
+  const disc = r.bytes(8);
+  if (!disc.equals(accountDiscriminator('Contribution'))) {
+    throw new Error('Not a Contribution account');
+  }
   const offering = r.pubkey();
   const wallet = r.pubkey();
   const amount = r.u64();
@@ -189,7 +195,10 @@ export interface PlatformSnapshot {
 
 export function decodePlatform(data: Buffer): PlatformSnapshot {
   const r = new Reader(data);
-  r.bytes(8);
+  const disc = r.bytes(8);
+  if (!disc.equals(accountDiscriminator('Platform'))) {
+    throw new Error('Not a Platform account');
+  }
   const admin = r.pubkey();
   const usdcMint = r.pubkey();
   const usdtMint = r.optionPubkey();

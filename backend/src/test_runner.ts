@@ -7,7 +7,37 @@ import { getAllCommodityPrices } from './mocks/fiat_oracle';
 import { getMervalStocks } from './custody/stocks';
 import { canFinalizeFromSnapshot, parseOfferingState } from './solana/lifecycle_rules';
 import { settlementAction } from './market/settlement_rules';
-import { setCustody, custodialSigningKey, upsertLogin } from './auth/accounts';
+import {
+  setCustody,
+  custodialSigningKey,
+  upsertLogin,
+  requireApprovedTrader,
+  getAccount,
+} from './auth/accounts';
+import { isKycEnforced } from './solana/connection';
+import { isSolanaAddress, isSolanaPublicKey } from './solana/keys';
+import {
+  assertMintable,
+  createListing,
+  deployListing,
+  isOnChainListing,
+  mintListingTokens,
+  Listing,
+} from './admin/listings';
+import { offeringPda } from './solana/pda';
+import { usdcMint } from './solana/usdc';
+import { listingChainMeta } from './solana/onchain';
+import {
+  LEGAL_CNV_RECORD_MAX,
+  LEGAL_TERMS_URI_MAX,
+  assertLegalInfoLengths,
+} from './solana/offering';
+import { investorTypeFromName } from './solana/kyc';
+import { InvestorType } from './solana/program';
+import { mapSolanaError } from './solana/tx';
+import { accountDiscriminator } from './solana/borsh';
+import { decodePlatform, decodeContribution, decodeOpa } from './solana/offering_state';
+import { isProgramDeployed, PLACEHOLDER_PROGRAM_ID } from './solana/deployment';
 
 console.log('=== INICIANDO SUITE DE PRUEBAS DE FRACTACHAIN BACKEND ===');
 
@@ -165,12 +195,20 @@ assert(
   'Una licitación sandbox abierta no la cierra el settlement automático',
 );
 assert(
-  settlementAction({ status: 'CLOSED_SUCCESS', onChain: true }) === 'settle_holders',
-  'Cerrada con éxito acredita las unidades sin que el inversor reclame',
+  settlementAction({ status: 'CLOSED_SUCCESS', onChain: true }) === 'settle_on_chain',
+  'Cerrada con éxito on-chain reintenta distribute() (no sandbox ledger)',
 );
 assert(
-  settlementAction({ status: 'CLOSED_FAILED', onChain: true }) === 'skip',
-  'Cerrada fallida no acredita nada (el inversor usa refund)',
+  settlementAction({ status: 'CLOSED_FAILED', onChain: true }) === 'settle_on_chain',
+  'Cerrada fallida on-chain reintenta refund() en el sweep',
+);
+assert(
+  settlementAction({ status: 'CLOSED_SUCCESS', onChain: false }) === 'settle_holders',
+  'Sandbox CLOSED_SUCCESS sigue acreditando en ledger local',
+);
+assert(
+  settlementAction({ status: 'CLOSED_FAILED', onChain: false }) === 'skip',
+  'Sandbox CLOSED_FAILED no acredita (refund path)',
 );
 
 console.log('\n[9] Probando que ninguna respuesta filtre material secreto:');
@@ -212,6 +250,202 @@ const pwUser = `pw-${Date.now()}@example.com`;
 upsertLogin({ email: pwUser, password: 'secret123' });
 assert(!throws(() => upsertLogin({ email: pwUser, password: 'secret123' })), 'Login con contraseña correcta sigue funcionando');
 assert(throws(() => upsertLogin({ email: pwUser, password: 'wrong123' })), 'Contraseña incorrecta se rechaza');
+
+console.log('\n[11] Probando soft KYC en Devnet (sin bloqueo duro):');
+assert(isKycEnforced() === false, 'Cluster default (devnet) no exige KYC duro');
+const soft = upsertLogin({ email: `soft-kyc-${Date.now()}@example.com`, name: 'Soft Kyc' });
+setCustody(soft.user.id, 'CUSTODIAL');
+const softAcct = getAccount(soft.user.id)!;
+softAcct.kycStatus = 'UNREGISTERED';
+let softTradeOk = true;
+try {
+  requireApprovedTrader(softAcct);
+} catch {
+  softTradeOk = false;
+}
+assert(softTradeOk, 'Devnet permite operar con wallet y KYC UNREGISTERED');
+assert(Boolean(softAcct.publicKey), 'Custodia crea publicKey Solana');
+
+console.log('\n[12] Probando que Offering PDAs cuentan como on-chain (no isOnCurve):');
+{
+  const listingId = `listing-pda-test-${Date.now()}`;
+  const [pda] = offeringPda(listingId);
+  const pdaStr = pda.toBase58();
+  assert(isSolanaAddress(pdaStr) === true, 'isSolanaAddress acepta PDA off-curve');
+  assert(isSolanaPublicKey(pdaStr) === false, 'isSolanaPublicKey rechaza PDA (off-curve)');
+  const fakeListing = {
+    id: listingId,
+    stockContract: pdaStr,
+    licitacionContract: pdaStr,
+  } as Listing;
+  assert(isOnChainListing(fakeListing) === true, 'isOnChainListing reconoce Offering PDA');
+  const sandboxListing = {
+    id: listingId,
+    stockContract: 'SandboxFake1111111111111111111111111111111',
+    licitacionContract: '',
+  } as Listing;
+  assert(isOnChainListing(sandboxListing) === false, 'isOnChainListing rechaza address que no es el PDA');
+}
+
+console.log('\n[13] mint_supply one-shot guard + USDC mint env precedence:');
+{
+  const prev = process.env.SOLANA_USDC_MINT;
+  process.env.SOLANA_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+  try {
+    const mint = usdcMint();
+    assert(
+      mint?.toBase58() === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+      'usdcMint lee env antes que deployments',
+    );
+  } finally {
+    if (prev == null) delete process.env.SOLANA_USDC_MINT;
+    else process.env.SOLANA_USDC_MINT = prev;
+  }
+
+  const tag = Date.now().toString(36).toUpperCase().slice(-4);
+  const created = createListing({
+    legalName: 'Mint Once SA',
+    tradeName: 'MintOnce',
+    cuit: '30-12345678-9',
+    jurisdiction: 'Argentina',
+    sector: 'Agro',
+    ticker: `MNT${tag}`,
+    tokenTicker: `tMNT${tag}`.slice(0, 12),
+    isin: `ARMNT${tag}000`,
+    authorizedShares: 1_000_000,
+    sharesToTokenize: 1000,
+    pricePerShareUsdc: 10,
+    cajaSubaccount: `CV-MNT-${tag}`,
+    custodianCuit: '30-50001091-2',
+    cnvRecordId: `CNV-MNT-${tag}`,
+    bymaRequestId: '',
+    legalTermsUri: 'https://fractachain.ar/legal/demo',
+    estatutoHash: 'a'.repeat(64),
+    auditor: 'PwC',
+    issuerPublicKey: '5xot9PVkPHVfvWxvXzMhQq9rY5vWn1bVfQ7kQp8mE3xJ',
+    proceedsWallet: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+    paymentKind: 'USDC',
+    offeringSoftCapUsdc: 100,
+    offeringHardCapUsdc: 1000,
+    offeringDays: 30,
+    tnaUsd: 0,
+    minInvestmentUsdc: 20,
+    useOfProceeds: 'Test mint one-shot guard',
+  });
+  const [pda] = offeringPda(created.id);
+  deployListing(created.id, { contractId: pda.toBase58() });
+  mintListingTokens(created.id, 100);
+  let blocked = false;
+  try {
+    assertMintable(created.id, 50);
+  } catch (e: any) {
+    blocked = /una sola vez|one-shot|mint_supply/i.test(String(e?.message || e));
+  }
+  assert(blocked, 'Segundo mint on-chain se bloquea cuando tokensMinted > 0');
+}
+
+console.log('\n[14] Backend↔program wiring helpers (errors, legal, KYC type, live meta):');
+{
+  // 22 + 6000 = 6022 = 0x1786; 23 → 0x1787
+  const paymentMintErr = mapSolanaError(
+    new Error('failed to send transaction: custom program error: 0x1786'),
+  );
+  assert(
+    /allowlist|mint de pago/i.test(paymentMintErr.message),
+    'mapSolanaError mapea PaymentMintNotAllowed (22)',
+  );
+  const notDraft = mapSolanaError(
+    new Error('Simulation failed: custom program error: 0x1787'),
+  );
+  assert(/Draft|una sola vez/i.test(notDraft.message), 'mapSolanaError mapea NotDraft (23)');
+
+  assert(investorTypeFromName('Foreign') === InvestorType.Foreign, 'investorTypeFromName Foreign');
+  assert(
+    investorTypeFromName('Institutional') === InvestorType.Institutional,
+    'investorTypeFromName Institutional',
+  );
+
+  let legalBlocked = false;
+  try {
+    assertLegalInfoLengths({
+      fideicomisoHash: Buffer.alloc(32),
+      cnvRecordId: 'x'.repeat(LEGAL_CNV_RECORD_MAX + 1),
+      legalTermsUri: 'https://ok',
+    });
+  } catch (e: any) {
+    legalBlocked = /cnvRecordId|64/.test(String(e?.message || e));
+  }
+  assert(legalBlocked, 'assertLegalInfoLengths rechaza cnvRecordId > 64');
+
+  let uriBlocked = false;
+  try {
+    assertLegalInfoLengths({
+      fideicomisoHash: Buffer.alloc(32),
+      cnvRecordId: 'CNV-OK',
+      legalTermsUri: 'u'.repeat(LEGAL_TERMS_URI_MAX + 1),
+    });
+  } catch (e: any) {
+    uriBlocked = /legalTermsUri|128/.test(String(e?.message || e));
+  }
+  assert(uriBlocked, 'assertLegalInfoLengths rechaza legalTermsUri > 128');
+
+  const listingId = `listing-live-meta-${Date.now()}`;
+  const [pda] = offeringPda(listingId);
+  const liveMeta = listingChainMeta({
+    id: listingId,
+    licitacionContract: pda.toBase58(),
+  });
+  assert(liveMeta.live === true, 'listingChainMeta.live true para Offering PDA');
+  const fakeMeta = listingChainMeta({
+    id: listingId,
+    licitacionContract: 'SandboxFake1111111111111111111111111111111',
+  });
+  assert(fakeMeta.live === false, 'listingChainMeta.live false para sandbox fake');
+
+  let discOk = false;
+  try {
+    decodePlatform(Buffer.alloc(100, 7));
+  } catch (e: any) {
+    discOk = /Not a Platform/.test(String(e?.message || e));
+  }
+  assert(discOk, 'decodePlatform exige discriminator account:Platform');
+  assert(accountDiscriminator('Platform').length === 8, 'accountDiscriminator Platform es 8 bytes');
+  let contribDisc = false;
+  try {
+    decodeContribution(Buffer.alloc(80, 1));
+  } catch (e: any) {
+    contribDisc = /Not a Contribution/.test(String(e?.message || e));
+  }
+  assert(contribDisc, 'decodeContribution exige discriminator');
+  let opaDisc = false;
+  try {
+    decodeOpa(Buffer.alloc(120, 2));
+  } catch (e: any) {
+    opaDisc = /Not an Opa/.test(String(e?.message || e));
+  }
+  assert(opaDisc, 'decodeOpa exige discriminator');
+}
+
+console.log('\n[15] isProgramDeployed rechaza placeholder + settlement on-chain closed:');
+{
+  const prevDeployed = process.env.FRACTACHAIN_PROGRAM_DEPLOYED;
+  const prevId = process.env.FRACTACHAIN_PROGRAM_ID;
+  process.env.FRACTACHAIN_PROGRAM_DEPLOYED = 'true';
+  process.env.FRACTACHAIN_PROGRAM_ID = PLACEHOLDER_PROGRAM_ID;
+  assert(
+    isProgramDeployed() === false,
+    'DEPLOYED=true con program id placeholder → sandbox',
+  );
+  process.env.FRACTACHAIN_PROGRAM_ID = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+  assert(
+    isProgramDeployed() === true,
+    'DEPLOYED=true con program id real → live',
+  );
+  if (prevDeployed == null) delete process.env.FRACTACHAIN_PROGRAM_DEPLOYED;
+  else process.env.FRACTACHAIN_PROGRAM_DEPLOYED = prevDeployed;
+  if (prevId == null) delete process.env.FRACTACHAIN_PROGRAM_ID;
+  else process.env.FRACTACHAIN_PROGRAM_ID = prevId;
+}
 
 console.log(`\n=== RESUMEN: ${testsPassed} PASADOS, ${testsFailed} FALLIDOS ===\n`);
 if (testsFailed > 0) {

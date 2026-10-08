@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
+import SoftKycNotice from '../../components/SoftKycNotice';
 import { useAuth, nextOnboardingPath } from '../../context/AuthContext';
 import { useI18n } from '../../context/I18nContext';
 import { API_BASE_URL, bearerHeaders } from '../../lib/api';
+import { isDevnetSoftKyc } from '../../lib/devnetMode';
 import { signAndRelay } from '../../lib/selfCustody';
 import { explorerTx } from '../../lib/explorer';
 
@@ -25,7 +27,7 @@ type Pool = {
   onChain: boolean;
 };
 
-type ContributeResult = { onChain?: { contributeHash?: string } };
+type ContributeResult = { onChain?: { contributeHash?: string; hash?: string } };
 
 const fmt = (n: number) => (Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—');
 
@@ -63,7 +65,7 @@ function PoolCard({ pool, onDone }: { pool: Pool; onDone: () => void }) {
         if (!res.ok || !json.success) throw new Error(json.message || t('acct.errorGeneric'));
         data = json.data;
       }
-      setMsg({ ok: true, text: t('acct.subscribed'), tx: data?.onChain?.contributeHash });
+      setMsg({ ok: true, text: t('acct.subscribed'), tx: data?.onChain?.contributeHash || data?.onChain?.hash });
       await refreshUser();
       onDone();
     } catch (err: any) {
@@ -113,7 +115,7 @@ function PoolCard({ pool, onDone }: { pool: Pool; onDone: () => void }) {
         </Link>
       ) : !ready ? (
         <Link href={nextOnboardingPath(user)} className="rounded-xl border border-black/15 py-2.5 text-center text-sm font-bold">
-          {t('acct.finishOnboarding')}
+          {isDevnetSoftKyc() ? t('acct.finishWallet') : t('acct.finishOnboarding')}
         </Link>
       ) : open ? (
         <div>
@@ -181,6 +183,7 @@ export default function MercadoPage() {
     <div className="py-6">
       <h1 className="font-serif italic text-3xl sm:text-4xl">{t('acct.marketTitle')}</h1>
       <p className="mt-2 text-sm text-black/60">{t('acct.marketLead')}</p>
+      <SoftKycNotice className="mt-3" />
 
       {pools === null ? (
         <p className="mt-8 text-sm text-black/50">{t('misc.loading')}</p>

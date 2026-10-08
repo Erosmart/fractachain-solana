@@ -1,6 +1,6 @@
 'use client';
 
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, parseApiJson } from './api';
 import { solanaSignTransaction } from './solanaWallet';
 import { tClient } from './i18n';
 
@@ -29,7 +29,7 @@ export async function postJson<T>(
     },
     body: JSON.stringify(body || {}),
   });
-  const json: ApiEnvelope = await res.json().catch(() => ({}));
+  const json = await parseApiJson<ApiEnvelope>(res);
   if (!res.ok || json.success === false) {
     throw new Error(json.message || tClient('err.opFailed'));
   }

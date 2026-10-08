@@ -1,7 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { API_BASE_URL } from '../lib/api';
+import { API_BASE_URL, parseApiJson } from '../lib/api';
+import { isKycRequired } from '../lib/devnetMode';
 import { signAndRelay } from '../lib/selfCustody';
 import { tClient } from '../lib/i18n';
 import { ensureUsdcReady } from '../lib/usdc';
@@ -126,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
         headers: { Authorization: `Bearer ${saved}` },
       });
-      const data = await res.json();
+      const data = await parseApiJson<{ success?: boolean; user?: unknown }>(res);
       if (data.success && data.user) {
         applySession(saved, data.user);
       } else {
@@ -175,8 +176,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           idToken: fbData.idToken,
         }),
       });
-      const data = await res.json();
-      if (!data.success || !data.user) throw new Error(data.message || tClient('err.loginFail'));
+      const data = await parseApiJson<{ success?: boolean; user?: unknown; token?: string; message?: string }>(res);
+      if (!data.success || !data.user || !data.token) throw new Error(data.message || tClient('err.loginFail'));
       const u = normalize(data.user);
       applySession(data.token, data.user);
       return u;
@@ -200,8 +201,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok || !data.success || !data.user) throw new Error(data.message || tClient('err.walletLogin'));
+      const data = await parseApiJson<{ success?: boolean; user?: unknown; token?: string; message?: string }>(res);
+      if (!res.ok || !data.success || !data.user || !data.token) throw new Error(data.message || tClient('err.walletLogin'));
       const u = normalize(data.user);
       applySession(data.token, data.user);
       // Una firma más dentro del login: crea la ATA de USDC y
@@ -226,8 +227,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, name }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || tClient('err.loginGeneric'));
+      const data = await parseApiJson<{ success?: boolean; user?: unknown; token?: string; message?: string }>(res);
+      if (!res.ok || !data.success || !data.token) throw new Error(data.message || tClient('err.loginGeneric'));
       const u = normalize(data.user);
       applySession(data.token, data.user);
       // Wallets ya configuradas: custodiales se fondean server-side sin popup;
@@ -253,7 +254,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await parseApiJson<{ success?: boolean; user?: unknown; message?: string }>(res);
     if (!res.ok || !data.success) throw new Error(data.message || tClient('err.walletLink'));
     applySession(token, data.user);
     // Al vincular la wallet también queda habilitada para recibir USDC.
@@ -267,7 +268,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ mode, publicKey }),
     });
-    const data = await res.json();
+    const data = await parseApiJson<{ success?: boolean; user?: unknown; message?: string }>(res);
     if (!res.ok || !data.success) throw new Error(data.message || tClient('err.custodySave'));
     applySession(token, data.user);
     // Mismo post-paso que en login/link: custodial se resuelve en el backend,
@@ -282,7 +283,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await parseApiJson<{ success?: boolean; user?: unknown; message?: string }>(res);
     if (!res.ok || !data.success) throw new Error(data.message || tClient('err.kycSend'));
     applySession(token, data.user);
   }, [token, applySession]);
@@ -307,7 +308,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
-    const data = await res.json();
+    const data = await parseApiJson<{ success?: boolean; data?: unknown; message?: string }>(res);
     if (!res.ok || !data.success) throw new Error(data.message || tClient('err.tokenApprove'));
     applySession(token, data.data);
   }, [token, user?.custodyMode, applySession]);
@@ -318,7 +319,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
-    const data = await res.json();
+    const data = await parseApiJson<{ success?: boolean; data?: unknown; message?: string }>(res);
     if (!res.ok || !data.success) throw new Error(data.message || tClient('err.claimFail'));
     applySession(token, data.data);
     return data.data;
@@ -330,7 +331,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
-    const data = await res.json();
+    const data = await parseApiJson<{ success?: boolean; data?: unknown; message?: string }>(res);
     if (!res.ok || !data.success) throw new Error(data.message || tClient('err.distributeFail'));
     await refreshUser();
     return data.data;
@@ -342,7 +343,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
-    const data = await res.json();
+    const data = await parseApiJson<{ success?: boolean; data?: unknown; message?: string }>(res);
     if (!res.ok || !data.success) throw new Error(data.message || tClient('err.finalizeFail'));
     return data.data;
   }, [token]);
@@ -362,7 +363,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
-    const data = await res.json();
+    const data = await parseApiJson<{ success?: boolean; data?: { user?: unknown } & Record<string, unknown>; message?: string }>(res);
     if (!res.ok || !data.success) throw new Error(data.message || tClient('err.refundFail'));
     if (data.data?.user) applySession(token, data.data.user);
     return data.data;
@@ -374,8 +375,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.message || tClient('err.dividendFail'));
+    const data = await parseApiJson<{ success?: boolean; data?: { user?: unknown }; message?: string }>(res);
+    if (!res.ok || !data.success || !data.data?.user) throw new Error(data.message || tClient('err.dividendFail'));
     applySession(token, data.data.user);
   }, [token, applySession]);
 
@@ -439,14 +440,20 @@ export function nextOnboardingPath(user: User | null) {
   if (!user) return '/login';
   if (!user.custodyMode) return '/onboarding/wallet';
   if (user.isAdmin) return '/dashboard';
-  if (user.kycStatus === 'UNREGISTERED') return '/onboarding/kyc';
-  if (user.kycStatus !== 'APPROVED') return '/onboarding/pending';
+  // Devnet: wallet is enough — KYC is optional (soft notice in the UI).
+  // Mainnet: keep the hard gate until APPROVED.
+  if (isKycRequired()) {
+    if (user.kycStatus === 'UNREGISTERED') return '/onboarding/kyc';
+    if (user.kycStatus !== 'APPROVED') return '/onboarding/pending';
+  }
   return '/dashboard';
 }
 
 export function afterAuthPath(user: User, nextParam?: string | null) {
   const dest = nextOnboardingPath(user);
   if (user.isAdmin && dest === '/dashboard') return nextParam || '/admin/kyc';
-  if (nextParam && user.kycStatus === 'APPROVED') return nextParam;
+  const canEnter =
+    Boolean(user.custodyMode) && (!isKycRequired() || user.kycStatus === 'APPROVED');
+  if (nextParam && canEnter) return nextParam;
   return dest;
 }

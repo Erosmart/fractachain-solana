@@ -13,6 +13,21 @@ TOOLS_VERSION="${TOOLS_VERSION:-v1.57}"
 anchor keys sync    # declare_id! + Anchor.toml ← pubkey real de target/deploy/fractachain-keypair.json
 anchor build --tools-version "$TOOLS_VERSION"   # compila ya con el Program ID correcto
 
+PROGRAM_ID=$(solana address -k target/deploy/fractachain-keypair.json 2>/dev/null || true)
+if [[ -z "${PROGRAM_ID}" ]]; then
+  PROGRAM_ID=$(grep -oP 'declare_id!\("\K[^"]+' programs/fractachain/src/lib.rs || true)
+fi
 echo
-echo "Program id: $(solana address -k target/deploy/fractachain-keypair.json 2>/dev/null || grep -o 'declare_id!("[^"]*")' programs/fractachain/src/lib.rs)"
-echo "Verificar que deployments/devnet.json use el mismo ID antes de deployar."
+echo "Program id: ${PROGRAM_ID}"
+# Stamp programId into deployments/devnet.json (keep deployedAt null until 03-deploy).
+if [[ -n "${PROGRAM_ID}" && -f deployments/devnet.json ]]; then
+  node - "$PROGRAM_ID" <<'NODE'
+const fs = require('fs');
+const file = 'deployments/devnet.json';
+const dep = JSON.parse(fs.readFileSync(file, 'utf8'));
+dep.programId = process.argv[2];
+fs.writeFileSync(file, JSON.stringify(dep, null, 2));
+console.log('deployments/devnet.json programId sync OK (deployedAt still null until 03-deploy)');
+NODE
+fi
+echo "Siguiente: ./scripts/devnet/03-deploy.sh (no crear wallets aquí)."

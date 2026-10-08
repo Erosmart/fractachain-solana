@@ -21,8 +21,10 @@ function WalletBridge() {
 }
 
 /**
- * Standard-wallet detection (Wallet Standard) covers Phantom, Solflare and
- * Backpack without per-wallet adapters — `wallets={[]}` is intentional.
+ * Wallet Standard auto-registers installed Solana wallets (Phantom, Solflare,
+ * Backpack, and MetaMask's Solana account if present). We pass `wallets={[]}`
+ * so we do not also pull in EVM-only adapter packages; WalletPicker filters
+ * MetaMask and always offers Phantom / Solflare / Backpack install links.
  */
 export default function SolanaWalletProvider({ children }: { children: React.ReactNode }) {
   const wallets = useMemo(() => [], []);

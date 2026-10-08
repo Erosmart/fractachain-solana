@@ -16,10 +16,12 @@ export const USDC_UNITS = 1_000_000;
 
 /** Payment mint for this cluster — SPL Token (not Token-2022). */
 export function usdcMint(): PublicKey | null {
+  // Env wins (Railway) — same precedence as FRACTACHAIN_PROGRAM_ID.
+  const env = (process.env.SOLANA_USDC_MINT || '').trim();
+  if (env) return new PublicKey(env);
   const dep = loadDeployment();
-  if (dep?.usdcMint) return new PublicKey(dep.usdcMint);
-  const env = process.env.SOLANA_USDC_MINT;
-  return env ? new PublicKey(env) : null;
+  const fromFile = (dep?.usdcMint || '').trim();
+  return fromFile ? new PublicKey(fromFile) : null;
 }
 
 export function usdcMintOrThrow(): PublicKey {
@@ -40,9 +42,12 @@ export function unitsToUsdc(units: bigint | number): number {
   return Number(units) / USDC_UNITS;
 }
 
-export async function usdcBalance(owner: PublicKey | string): Promise<number> {
+export async function usdcBalance(
+  owner: PublicKey | string,
+  mintOverride?: PublicKey | null,
+): Promise<number> {
   const pk = typeof owner === 'string' ? new PublicKey(owner) : owner;
-  const mint = usdcMint();
+  const mint = mintOverride || usdcMint();
   if (!mint) return 0;
   try {
     const ata = getAssociatedTokenAddressSync(mint, pk, true, TOKEN_PROGRAM_ID);
@@ -97,7 +102,19 @@ export async function mintDemoUsdc(owner: PublicKey, amountUsdc: number): Promis
     [],
     TOKEN_PROGRAM_ID,
   );
-  const tx = new Transaction().add(buildCreateUsdcAtaIx(owner, authority.publicKey), ix);
+  const tx = new Transaction();
+  // Only create the ATA when missing — a second fund must mint into the existing account.
+  let ataExists = false;
+  try {
+    await getAccount(conn, ata, undefined, TOKEN_PROGRAM_ID);
+    ataExists = true;
+  } catch {
+    ataExists = false;
+  }
+  if (!ataExists) {
+    tx.add(buildCreateUsdcAtaIx(owner, authority.publicKey));
+  }
+  tx.add(ix);
   tx.feePayer = authority.publicKey;
   tx.recentBlockhash = (await conn.getLatestBlockhash()).blockhash;
   tx.sign(authority);

@@ -4,7 +4,7 @@ import { isProgramDeployed, loadDeployment } from './deployment';
 import { adminPublicKey } from './keys';
 import { canFinalizeFromSnapshot, parseOfferingState } from './lifecycle_rules';
 import { fetchOffering, OfferingSnapshot } from './offering_state';
-import { programId } from './pda';
+import { offeringPda, programId } from './pda';
 import { usdcMint, unitsToUsdc } from './usdc';
 
 export { explorerTx, explorerAddress };
@@ -41,13 +41,27 @@ export async function getOnChainStatus(): Promise<OnChainStatus> {
 /**
  * Listing metadata the API attaches to payloads — mirrors the old
  * `listingChainMeta` shape (contractId → offering PDA, explorer links).
+ *
+ * `live` is true only when the stored address matches the derived Offering PDA
+ * for `listing.id` (sandbox fake contract ids stay false).
  */
-export function listingChainMeta(listing?: { licitacionContract?: string | null } | null) {
-  const offering = listing?.licitacionContract || null;
+export function listingChainMeta(
+  listing?: { id?: string; licitacionContract?: string | null; stockContract?: string | null } | null,
+) {
+  const offering = listing?.licitacionContract || listing?.stockContract || null;
+  let live = false;
+  if (offering && listing?.id) {
+    try {
+      const [pda] = offeringPda(listing.id);
+      live = pda.toBase58() === offering;
+    } catch {
+      live = false;
+    }
+  }
   return {
     contractId: offering,
-    /** The offering PDA exists on-chain — the UI can trust contract state. */
-    live: Boolean(offering),
+    /** True only for a real Offering PDA tied to this listing id. */
+    live,
     programId: programId().toBase58(),
     explorer: explorerAddress(offering),
     cluster: SOLANA_CLUSTER,
@@ -64,10 +78,15 @@ export async function receiptAfterContribute(
   extra?: { contributeHash?: string },
 ) {
   const snap = await fetchOffering(listingId).catch(() => null);
+  const contributeHash = extra?.contributeHash || null;
+  const explorer = explorerTx(contributeHash);
   return {
     ...(snap ? snapshotToApi(snap) : {}),
-    hash: extra?.contributeHash || null,
-    explorer: explorerTx(extra?.contributeHash),
+    hash: contributeHash,
+    explorer,
+    // Aliases kept for mercado list/detail UIs that read contributeHash*.
+    contributeHash,
+    contributeExplorer: explorer,
     wallet: wallet || null,
   };
 }
@@ -113,10 +132,17 @@ export async function snapshotOfferingApi(listingId: string) {
   return snap ? snapshotToApi(snap) : null;
 }
 
-export function isOnChainListing(listing: { licitacionContract?: string | null } | null): boolean {
-  if (!listing?.licitacionContract) return false;
+/**
+ * Loose check: stored address parses as a Pubkey (incl. PDAs). Prefer
+ * `admin/listings.isOnChainListing` when a listing id is available — that one
+ * matches against the derived Offering PDA and rejects sandbox fakes.
+ */
+export function isOnChainListing(listing: { licitacionContract?: string | null; stockContract?: string | null } | null): boolean {
+  const addr = listing?.licitacionContract || listing?.stockContract;
+  if (!addr) return false;
   try {
-    new PublicKey(listing.licitacionContract);
+    // eslint-disable-next-line no-new
+    new PublicKey(addr);
     return true;
   } catch {
     return false;

@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { createWalletKeypair, isSolanaPublicKey, loadSolBalance, requestDevnetAirdrop } from './solana_devnet';
 import { getTestnetConfig } from '../admin/testnet';
 import { persistToPg } from '../data/pgstore';
+import { isKycEnforced } from '../solana/connection';
 
 export type CustodyMode = 'CUSTODIAL' | 'SELF' | null;
 /**
@@ -511,7 +512,12 @@ export function submitOnboardingKyc(
       .then(async ({ verifyInvestorOnChain }) => {
         await verifyInvestorOnChain(new (await import('@solana/web3.js')).PublicKey(account.publicKey));
       })
-      .catch(() => {});
+      .catch((err) =>
+        console.warn(
+          `[kyc] auto verify_investor failed for ${account.publicKey}:`,
+          (err as Error)?.message || err,
+        ),
+      );
   }
   return toPublic(account);
 }
@@ -543,11 +549,12 @@ export function setKycStatusByKycId(kycId: string, status: 'APPROVED' | 'REJECTE
 }
 
 export function requireApprovedTrader(account: Account) {
-  if (account.kycStatus !== 'APPROVED') {
-    throw new Error('Solo inversores con KYC aprobado pueden operar');
-  }
   if (!account.custodyMode || !account.publicKey) {
     throw new Error('Primero creá la wallet');
+  }
+  // Devnet/testnet: soft KYC — wallet is enough. Mainnet keeps the hard gate.
+  if (isKycEnforced() && account.kycStatus !== 'APPROVED') {
+    throw new Error('Solo inversores con KYC aprobado pueden operar');
   }
 }
 

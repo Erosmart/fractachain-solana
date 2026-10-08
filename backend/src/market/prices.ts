@@ -6,7 +6,7 @@
  * to the IPO price from the dossier. That last one is a reference, not a
  * market — we label it so the portfolio does not pretend BYMA printed it.
  */
-import { getListing, listListings, type Listing } from '../admin/listings';
+import { getListing, isOnChainListing, listListings, type Listing } from '../admin/listings';
 import { economicShares, getAccount } from '../auth/accounts';
 import { getBook } from './orderbook';
 import { counterAsset, listingAsset, sdexAvailable } from './manifest_book';
@@ -15,7 +15,6 @@ import { listDividends } from './dividends';
 import { loadSolBalance, loadTokenBalance, loadUsdcBalance } from '../auth/solana_devnet';
 import { explorerTx } from '../solana/onchain';
 import { usdcMint } from '../solana/usdc';
-import { isSolanaPublicKey } from '../solana/keys';
 
 // Canonical platform USDC mint: SOLANA_USDC_MINT env first, then
 // deployments/<cluster>.json.
@@ -114,7 +113,7 @@ export async function buildPortfolio(accountId: string) {
       const costBasis = Math.round((h.usdcAmount || 0) * 1e6) / 1e6;
       const pnl = Math.round((marketValue - costBasis) * 1e6) / 1e6;
       const pendingDividendUsdc = Math.round((h.pendingDividendUsdc || 0) * 1e6) / 1e6;
-      const onChain = listing ? Boolean(listing.licitacionContract && isSolanaPublicKey(listing.licitacionContract)) : false;
+      const onChain = listing ? isOnChainListing(listing) : false;
       const listingStatus = listing?.status || 'UNKNOWN';
       return {
         listingId: h.listingId,
