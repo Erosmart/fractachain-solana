@@ -1,6 +1,5 @@
 [toolchain]
 anchor_version = "1.2.0"
-# Must match `solana --version` on PATH, or anchor tries agave-install to switch.
 solana_version = "4.3.0"
 
 [features]
@@ -8,20 +7,21 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-fractachain = "Fractachain111111111111111111111111111111111"
+fractachain = "2d6JqnHjvAL1935Y6CXGnx2VB2Ff8L3Yi9tkApaHbJzd"
 
 [programs.localnet]
-fractachain = "Fractachain111111111111111111111111111111111"
-
-[registry]
-url = "https://api.devnet.solana.com"
+fractachain = "2d6JqnHjvAL1935Y6CXGnx2VB2Ff8L3Yi9tkApaHbJzd"
 
 [provider]
 cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
-[test]
-startup_wait = 10000
-
 [scripts]
 test = "cargo test"
+
+[hooks]
+
+[test]
+startup_wait = 10000
+shutdown_wait = 2000
+upgradeable = false

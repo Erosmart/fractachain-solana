@@ -4,7 +4,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-anchor deploy --provider.cluster devnet --provider.wallet deploy-keys/admin.json
+# --no-idl: Anchor 1.2 sube el IDL vía un programa de metadata que no está en
+# devnet ("program not found"). El backend arma las instrucciones a mano y no
+# lo necesita. Re-correr este script sobre un programa ya deployado lo upgradea.
+anchor program deploy --provider.cluster devnet --provider.wallet deploy-keys/admin.json \
+  --upgrade-authority deploy-keys/admin.json --no-idl
 
 PROGRAM_ID=$(solana address -k target/deploy/fractachain-keypair.json)
 echo "programId: $PROGRAM_ID"

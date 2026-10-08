@@ -50,7 +50,7 @@ export const SOLANA_COMMITMENT: Commitment =
 
 /** Fallback pre-deployment program id — replaced by deployments/<cluster>.json. */
 export const FALLBACK_PROGRAM_ID =
-  process.env.FRACTACHAIN_PROGRAM_ID || 'Fractachain111111111111111111111111111111111';
+  process.env.FRACTACHAIN_PROGRAM_ID || '2d6JqnHjvAL1935Y6CXGnx2VB2Ff8L3Yi9tkApaHbJzd';
 
 let cached: Connection | null = null;
 
