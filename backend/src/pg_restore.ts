@@ -1,18 +1,24 @@
 /**
- * Restore point for Postgres-backed persistence (local / non-image runs).
+ * Restore point for Postgres-backed persistence.
  *
- * Production image runs the compiled `dist/pg_restore.js` instead — see
- * backend/Dockerfile CMD. Logic must stay in sync with src/pg_restore.ts.
- *
- * Runs BEFORE the API server starts: pulls every row of `kv_store` into
- * data/<key>.json. No DATABASE_URL → no-op, files stay as shipped.
+ * Runs BEFORE the API server starts (see Dockerfile CMD): pulls every row of
+ * `kv_store` into data/<key>.json so the modules that snapshot their state at
+ * require-time boot with the last persisted contents instead of the empty
+ * files baked into the image. No DATABASE_URL → no-op, files stay as shipped.
  */
-const fs = require('fs');
-const path = require('path');
-const { Pool } = require('pg');
+import fs from 'fs';
+import path from 'path';
+import { Pool } from 'pg';
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
-const ALLOWED = new Set(['users.json', 'listings.json', 'orderbook.json', 'dividends.json', 'testnet.json', 'stocks.json']);
+const ALLOWED = new Set([
+  'users.json',
+  'listings.json',
+  'orderbook.json',
+  'dividends.json',
+  'testnet.json',
+  'stocks.json',
+]);
 
 async function main() {
   if (!process.env.DATABASE_URL) {
@@ -26,7 +32,7 @@ async function main() {
     );
     const res = await pool.query('SELECT key, data FROM kv_store');
     let n = 0;
-    for (const row of res.rows) {
+    for (const row of res.rows as Array<{ key: string; data: unknown }>) {
       if (!ALLOWED.has(row.key)) continue;
       fs.writeFileSync(path.join(DATA_DIR, row.key), JSON.stringify(row.data, null, 2));
       n++;
@@ -37,7 +43,8 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error('[pg] restore falló (arranca con archivos locales):', e.message);
+main().catch((e: unknown) => {
+  const message = e instanceof Error ? e.message : String(e);
+  console.error('[pg] restore falló (arranca con archivos locales):', message);
   process.exit(0); // nunca bloquea el arranque
 });

@@ -3,7 +3,7 @@
  *
  * Each module keeps its in-memory state and JSON-file cache exactly as before,
  * but every save() also upserts the document into the `kv_store` table. On the
- * next deploy, `scripts/pg_restore.js` rewrites the files from Postgres before
+ * next deploy, `dist/pg_restore.js` rewrites the files from Postgres before
  * the modules snapshot them — the DB is the source of truth, files are cache.
  */
 import { Pool } from 'pg';

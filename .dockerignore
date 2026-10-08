@@ -17,6 +17,9 @@ backend/data/users.json
 backend/data/selfies
 backend/data/orderbook.json
 backend/data/dividends.json
+# Force-include runtime bootstrap (never exclude from Docker context)
+!backend/scripts/
+!backend/scripts/**
 frontend/.next
 **/.cursor
 **/.vscode
