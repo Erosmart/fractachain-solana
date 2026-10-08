@@ -91,6 +91,7 @@ import { cancelOrder, getBook, listMarkets, placeOrder } from './market/orderboo
 import {
   autoFinalizeIfDue,
   finalizeListedOffering,
+  settleOnChainContributors,
   settleHolders,
   startSettlementSweep,
 } from './market/settlement';
@@ -696,7 +697,8 @@ async function requireFailedOffering(listing: Listing, investor?: string) {
 async function listingPayload(listingId: string, investor?: string) {
   const listing = getListing(listingId);
   if (!listing) return null;
-  const snap = isOnChainListing(listing) ? await fetchOffering(listing.id).catch(() => null) : null;
+  const onChain = isOnChainListing(listing);
+  const snap = onChain ? await fetchOffering(listing.id).catch(() => null) : null;
   let current = listing;
   if (snap && (snap.state === 'Successful' || snap.state === 'Failed') && listing.status === 'LISTED') {
     current = markListingClosed(
@@ -705,7 +707,15 @@ async function listingPayload(listingId: string, investor?: string) {
       unitsToUsdc(snap.totalRaised),
       { proceedsPaidTo: snap.fiduciary.toBase58() },
     );
-    await settleHolders(current).catch(() => []);
+    // On-chain offerings need distribute()/refund() — never the sandbox ledger path.
+    if (onChain) {
+      await settleOnChainContributors(current, snap).catch((err) => {
+        console.warn(`[listingPayload] settle on-chain ${listing.id}:`, err?.message || err);
+        return [];
+      });
+    } else {
+      await settleHolders(current).catch(() => []);
+    }
   }
   return {
     listing: current,
@@ -979,10 +989,9 @@ app.post('/api/listings/:id/claim', (req: Request, res: Response) => {
     const listing = getListing(req.params.id);
     const user = claimListingTokens(account.id, req.params.id, listing?.status === 'CLOSED_SUCCESS');
     const snap = listing && isOnChainListing(listing) ? await fetchOffering(listing.id).catch(() => null) : null;
-    // For on-chain listings the units already sit in the holder's ATA; the
-    // distribution check just verifies the balance matches.
+    // Gate on Offering PDA (not Manifest market) — distribute works before secondary opens.
     const distribution =
-      listing && sdexAvailable(listing)
+      listing && isOnChainListing(listing)
         ? await distributeClaimedTokens({ listingId: listing.id, accountId: account.id }).catch(
             (e: any) => ({ error: e?.message || 'error' }),
           )

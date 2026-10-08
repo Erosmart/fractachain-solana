@@ -26,6 +26,17 @@ import {
 } from './admin/listings';
 import { offeringPda } from './solana/pda';
 import { usdcMint } from './solana/usdc';
+import { listingChainMeta } from './solana/onchain';
+import {
+  LEGAL_CNV_RECORD_MAX,
+  LEGAL_TERMS_URI_MAX,
+  assertLegalInfoLengths,
+} from './solana/offering';
+import { investorTypeFromName } from './solana/kyc';
+import { InvestorType } from './solana/program';
+import { mapSolanaError } from './solana/tx';
+import { accountDiscriminator } from './solana/borsh';
+import { decodePlatform, decodeContribution, decodeOpa } from './solana/offering_state';
 
 console.log('=== INICIANDO SUITE DE PRUEBAS DE FRACTACHAIN BACKEND ===');
 
@@ -322,6 +333,88 @@ console.log('\n[13] mint_supply one-shot guard + USDC mint env precedence:');
     blocked = /una sola vez|one-shot|mint_supply/i.test(String(e?.message || e));
   }
   assert(blocked, 'Segundo mint on-chain se bloquea cuando tokensMinted > 0');
+}
+
+console.log('\n[14] Backend↔program wiring helpers (errors, legal, KYC type, live meta):');
+{
+  // 22 + 6000 = 6022 = 0x1786; 23 → 0x1787
+  const paymentMintErr = mapSolanaError(
+    new Error('failed to send transaction: custom program error: 0x1786'),
+  );
+  assert(
+    /allowlist|mint de pago/i.test(paymentMintErr.message),
+    'mapSolanaError mapea PaymentMintNotAllowed (22)',
+  );
+  const notDraft = mapSolanaError(
+    new Error('Simulation failed: custom program error: 0x1787'),
+  );
+  assert(/Draft|una sola vez/i.test(notDraft.message), 'mapSolanaError mapea NotDraft (23)');
+
+  assert(investorTypeFromName('Foreign') === InvestorType.Foreign, 'investorTypeFromName Foreign');
+  assert(
+    investorTypeFromName('Institutional') === InvestorType.Institutional,
+    'investorTypeFromName Institutional',
+  );
+
+  let legalBlocked = false;
+  try {
+    assertLegalInfoLengths({
+      fideicomisoHash: Buffer.alloc(32),
+      cnvRecordId: 'x'.repeat(LEGAL_CNV_RECORD_MAX + 1),
+      legalTermsUri: 'https://ok',
+    });
+  } catch (e: any) {
+    legalBlocked = /cnvRecordId|64/.test(String(e?.message || e));
+  }
+  assert(legalBlocked, 'assertLegalInfoLengths rechaza cnvRecordId > 64');
+
+  let uriBlocked = false;
+  try {
+    assertLegalInfoLengths({
+      fideicomisoHash: Buffer.alloc(32),
+      cnvRecordId: 'CNV-OK',
+      legalTermsUri: 'u'.repeat(LEGAL_TERMS_URI_MAX + 1),
+    });
+  } catch (e: any) {
+    uriBlocked = /legalTermsUri|128/.test(String(e?.message || e));
+  }
+  assert(uriBlocked, 'assertLegalInfoLengths rechaza legalTermsUri > 128');
+
+  const listingId = `listing-live-meta-${Date.now()}`;
+  const [pda] = offeringPda(listingId);
+  const liveMeta = listingChainMeta({
+    id: listingId,
+    licitacionContract: pda.toBase58(),
+  });
+  assert(liveMeta.live === true, 'listingChainMeta.live true para Offering PDA');
+  const fakeMeta = listingChainMeta({
+    id: listingId,
+    licitacionContract: 'SandboxFake1111111111111111111111111111111',
+  });
+  assert(fakeMeta.live === false, 'listingChainMeta.live false para sandbox fake');
+
+  let discOk = false;
+  try {
+    decodePlatform(Buffer.alloc(100, 7));
+  } catch (e: any) {
+    discOk = /Not a Platform/.test(String(e?.message || e));
+  }
+  assert(discOk, 'decodePlatform exige discriminator account:Platform');
+  assert(accountDiscriminator('Platform').length === 8, 'accountDiscriminator Platform es 8 bytes');
+  let contribDisc = false;
+  try {
+    decodeContribution(Buffer.alloc(80, 1));
+  } catch (e: any) {
+    contribDisc = /Not a Contribution/.test(String(e?.message || e));
+  }
+  assert(contribDisc, 'decodeContribution exige discriminator');
+  let opaDisc = false;
+  try {
+    decodeOpa(Buffer.alloc(120, 2));
+  } catch (e: any) {
+    opaDisc = /Not an Opa/.test(String(e?.message || e));
+  }
+  assert(opaDisc, 'decodeOpa exige discriminator');
 }
 
 console.log(`\n=== RESUMEN: ${testsPassed} PASADOS, ${testsFailed} FALLIDOS ===\n`);

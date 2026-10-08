@@ -126,7 +126,10 @@ export async function openSecondaryMarket(listing: Listing): Promise<string | nu
   if (listing.manifestMarket) return listing.manifestMarket;
   const snap = await fetchOffering(listing.id);
   if (!snap || snap.state !== 'Successful') return null;
-  const quote = usdcMint();
+  // Prefer the Offering's payment mint (set at open_offering) over env — same mint
+  // the primary market escrowed against.
+  const quote =
+    !snap.paymentMint.equals(PublicKey.default) ? snap.paymentMint : usdcMint();
   if (!quote) throw new Error('Falta el mint USDC configurado');
   const market = await createMarket(snap.rwaMint, quote);
   const baseVault = await vaultAddress(new PublicKey(market.market), snap.rwaMint);

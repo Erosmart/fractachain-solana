@@ -4,7 +4,7 @@ import { isProgramDeployed, loadDeployment } from './deployment';
 import { adminPublicKey } from './keys';
 import { canFinalizeFromSnapshot, parseOfferingState } from './lifecycle_rules';
 import { fetchOffering, OfferingSnapshot } from './offering_state';
-import { programId } from './pda';
+import { offeringPda, programId } from './pda';
 import { usdcMint, unitsToUsdc } from './usdc';
 
 export { explorerTx, explorerAddress };
@@ -41,13 +41,27 @@ export async function getOnChainStatus(): Promise<OnChainStatus> {
 /**
  * Listing metadata the API attaches to payloads — mirrors the old
  * `listingChainMeta` shape (contractId → offering PDA, explorer links).
+ *
+ * `live` is true only when the stored address matches the derived Offering PDA
+ * for `listing.id` (sandbox fake contract ids stay false).
  */
-export function listingChainMeta(listing?: { licitacionContract?: string | null } | null) {
-  const offering = listing?.licitacionContract || null;
+export function listingChainMeta(
+  listing?: { id?: string; licitacionContract?: string | null; stockContract?: string | null } | null,
+) {
+  const offering = listing?.licitacionContract || listing?.stockContract || null;
+  let live = false;
+  if (offering && listing?.id) {
+    try {
+      const [pda] = offeringPda(listing.id);
+      live = pda.toBase58() === offering;
+    } catch {
+      live = false;
+    }
+  }
   return {
     contractId: offering,
-    /** The offering PDA exists on-chain — the UI can trust contract state. */
-    live: Boolean(offering),
+    /** True only for a real Offering PDA tied to this listing id. */
+    live,
     programId: programId().toBase58(),
     explorer: explorerAddress(offering),
     cluster: SOLANA_CLUSTER,

@@ -154,12 +154,22 @@ export function approveKyc(id: string, bypassHoursCheck: boolean = false): { suc
     // accounts store optional
   }
 
-  // On-chain half of the approval: authorize the holder's trustlines so the
-  // ledger itself starts letting them hold and trade. Fire-and-forget on
-  // purpose — the officer's decision is already recorded, and a Horizon
-  // hiccup is recoverable through syncHolderAuthorization.
-  if (isSolanaPublicKey(record.walletAddress)) void verifyInvestorOnChain(new PublicKey(record.walletAddress)).catch(() => {});
-
+  // On-chain half of the approval: seed the Investor PDA. Fire-and-forget so
+  // the officer decision sticks if RPC is flaky; failures are logged and
+  // recoverable via /api/admin/compliance/sync.
+  if (isSolanaPublicKey(record.walletAddress)) {
+    void verifyInvestorOnChain(
+      new PublicKey(record.walletAddress),
+      record.countryCode,
+      undefined,
+      record.investorType,
+    ).catch((err) =>
+      console.warn(
+        `[kyc] verify_investor failed for ${record.walletAddress}:`,
+        (err as Error)?.message || err,
+      ),
+    );
+  }
 
   return { success: true, record };
 }
@@ -194,10 +204,16 @@ export function revokeKyc(id: string, reason: string): { success: boolean; recor
     else setKycStatusByKycId(record.id, 'REVOKED');
   } catch {}
 
-  // Hard freeze: clearing the authorized flag without maintain-liabilities
-  // makes the network delete this holder's open offers as well as locking the
-  // balance. A revocation is a compliance action, not a grace period.
-  if (isSolanaPublicKey(record.walletAddress)) void revokeInvestorOnChain(new PublicKey(record.walletAddress)).catch(() => {});
+  // Hard revoke on-chain Investor PDA. Fire-and-forget with logging — ledger
+  // status already flipped; sync recovers RPC failures.
+  if (isSolanaPublicKey(record.walletAddress)) {
+    void revokeInvestorOnChain(new PublicKey(record.walletAddress)).catch((err) =>
+      console.warn(
+        `[kyc] revoke_investor failed for ${record.walletAddress}:`,
+        (err as Error)?.message || err,
+      ),
+    );
+  }
 
   return { success: true, record };
 }
