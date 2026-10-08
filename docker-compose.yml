@@ -1,9 +1,12 @@
 # Local stand-in for the two Railway services.
 #   docker compose up --build
 #
-# Browser → frontend:3000/api/* → Next rewrite → backend:8080 (BACKEND_URL).
+# Browser → frontend:3000/api/* → Next runtime proxy → backend:8080 (BACKEND_URL).
 # Optional: set NEXT_PUBLIC_API_URL to a *public backend* origin for split hosting
 # (rebuild frontend). Never point it at the frontend URL.
+#
+# BACKEND_URL=http://backend:8080 is Compose-only DNS. On Railway set BACKEND_URL
+# to the Express service private/public URL — never rely on hostname "backend".
 services:
   backend:
     build:
@@ -41,12 +44,13 @@ services:
       args:
         # Empty → same-origin /api proxy. Set only for a separate public API URL.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
-        BACKEND_URL: http://backend:8080
     ports:
       - "3000:3000"
     environment:
       PORT: "3000"
       HOSTNAME: 0.0.0.0
+      # Runtime (not build-time) — App Router proxy reads this per request.
+      BACKEND_URL: http://backend:8080
     depends_on:
       backend:
         condition: service_healthy

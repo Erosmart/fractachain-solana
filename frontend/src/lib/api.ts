@@ -24,7 +24,7 @@ function isPrivateLanHost(hostname: string): boolean {
  * Pure resolver (exported for unit tests).
  *
  * - Explicit absolute non-loopback `NEXT_PUBLIC_API_URL` → use it (cross-origin API).
- * - Unset / empty → same-origin `''` in the browser (Next rewrites `/api` → backend).
+ * - Unset / empty → same-origin `''` in the browser (Next proxies `/api` → BACKEND_URL).
  * - Loopback env + page on loopback → keep loopback API (local `next dev`).
  * - Loopback env + page on private LAN → rewrite host only (phone/LAN testing).
  * - Loopback env + page on a public host → same-origin `''` (never `https://app:8080`).
