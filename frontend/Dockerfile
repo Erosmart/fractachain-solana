@@ -43,13 +43,15 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
-# Runtime proxy target (docker-compose / Railway). Unset → localhost:8080.
-# Compose sets http://backend:8080. Railway must set the Express service URL.
+# Runtime proxy target (docker-compose / Railway). Unset → localhost:8080 locally.
+# Compose sets http://backend:8080. On Railway you MUST set the Express service
+# URL — empty/localhost is refused at startup and by /health (see guard script).
 ENV BACKEND_URL=
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/scripts/railway-backend-guard.mjs ./railway-backend-guard.mjs
 RUN chown -R node:node /app
 USER node
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "node railway-backend-guard.mjs && node server.js"]
