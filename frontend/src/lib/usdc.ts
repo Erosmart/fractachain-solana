@@ -6,6 +6,7 @@ export interface UsdcFundResult {
   hash?: string;
   transaction?: string;
   publicKey?: string;
+  sol?: { airdropped: boolean; balance: number };
 }
 
 /**

@@ -116,6 +116,7 @@ import {
 } from './market/manifest_book';
 import { ensureWalletFunded } from './solana/wallet_funding';
 import { loadSolBalance, loadUsdcBalance } from './auth/solana_devnet';
+import { ensureSolBalance } from './solana/devnet';
 import { getTestnetConfig, setTestnetConfig } from './admin/testnet';
 import { isProgramDeployed, loadDeployment } from './solana/deployment';
 import { getOnChainStatus, listingChainMeta, receiptAfterContribute, explorerTx } from './solana/onchain';
@@ -365,14 +366,17 @@ app.post('/api/wallet/usdc/fund', async (req: Request, res: Response) => {
   try {
     if (!account.publicKey) throw new Error('La cuenta no tiene wallet Solana asociada');
     const wallet = new PublicKey(account.publicKey);
+    // Explicit user action ("Recibir fondos"): top up devnet SOL even when the
+    // auto-faucet is off — ensureSolBalance still refuses on mainnet-beta.
+    const sol = await ensureSolBalance(wallet, { force: true }).catch(() => undefined);
     try {
       const result = await mintDemoUsdc(wallet, 5_000);
-      return res.json({ success: true, data: { status: 'FUNDED', hash: result } });
+      return res.json({ success: true, data: { status: 'FUNDED', hash: result, sol } });
     } catch {
       const transaction = await buildUnsignedTx(wallet, [buildCreateUsdcAtaIx(wallet)]);
       return res.json({
         success: true,
-        data: { status: 'NEED_TRUSTLINE', transaction, publicKey: account.publicKey },
+        data: { status: 'NEED_TRUSTLINE', transaction, publicKey: account.publicKey, sol },
       });
     }
   } catch (err: any) {

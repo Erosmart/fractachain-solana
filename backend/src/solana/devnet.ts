@@ -1,5 +1,5 @@
 import { PublicKey } from '@solana/web3.js';
-import { autoFaucetEnabled, getConnection } from './connection';
+import { autoFaucetEnabled, getConnection, SOLANA_CLUSTER } from './connection';
 import { isSolanaPublicKey } from './keys';
 
 /**
@@ -15,8 +15,11 @@ const LAMPORTS_TARGET = 0.2e9;
  * On localnet, airdrops are unlimited; on devnet they are rate-limited
  * (caller should treat failures as soft).
  */
-export async function ensureSolBalance(pubkey: PublicKey): Promise<{ airdropped: boolean; balance: number }> {
-  if (!autoFaucetEnabled()) {
+export async function ensureSolBalance(pubkey: PublicKey, opts?: { force?: boolean }): Promise<{ airdropped: boolean; balance: number }> {
+  if (SOLANA_CLUSTER === 'mainnet-beta') {
+    return { airdropped: false, balance: await getConnection().getBalance(pubkey) };
+  }
+  if (!opts?.force && !autoFaucetEnabled()) {
     return { airdropped: false, balance: 0 };
   }
   const conn = getConnection();
