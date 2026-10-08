@@ -838,7 +838,7 @@ const es = {
   },
   err: {
     loginFail: 'Login falló',
-    apiDown: 'No se pudo conectar al backend. Probá recargar; el API tiene que estar en el puerto 8080 (o configurá NEXT_PUBLIC_API_URL / BACKEND_URL).',
+    apiDown: 'No se pudo conectar al API. En Railway: same-origin /api (NEXT_PUBLIC_API_URL vacío + redeploy). Local: Express en :8080 o BACKEND_URL.',
     loginGeneric: 'No se pudo iniciar sesión',
     signIn: 'Iniciá sesión',
     walletLogin: 'No se pudo entrar con la wallet',
@@ -1939,7 +1939,7 @@ const en: Messages = {
   },
   err: {
     loginFail: 'Login failed',
-    apiDown: "Couldn't reach the backend. Try reloading; the API must be on port 8080 (or set NEXT_PUBLIC_API_URL / BACKEND_URL).",
+    apiDown: "Couldn't reach the API. On Railway use same-origin /api (leave NEXT_PUBLIC_API_URL empty and redeploy). Local: Express on :8080 or BACKEND_URL.",
     loginGeneric: 'Could not sign in',
     signIn: 'Log in first',
     walletLogin: 'Could not sign in with the wallet',

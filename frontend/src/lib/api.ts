@@ -2,14 +2,20 @@
 
 /**
  * Loopback / private-LAN helpers for resolving where the browser should call the API.
- * Public hosts must NOT inherit a baked `localhost` API URL (that produced HTML
- * SPA responses and `Unexpected token '<' ... is not valid JSON` on login).
+ * Public hosts must NOT inherit a baked `localhost` / Compose / private API URL
+ * (browser cannot reach those → Failed to fetch → login "apiDown").
  */
-function isLoopbackHost(hostname: string): boolean {
-  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+export function isLoopbackHost(hostname: string): boolean {
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname === '::1' ||
+    hostname === '[::1]'
+  );
 }
 
-function isPrivateLanHost(hostname: string): boolean {
+export function isPrivateLanHost(hostname: string): boolean {
   if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
   if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
   const m = /^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(hostname);
@@ -20,14 +26,25 @@ function isPrivateLanHost(hostname: string): boolean {
   return false;
 }
 
+/** Hosts the browser cannot call from a public Railway/Vercel page. */
+export function isBrowserUnreachableApiHost(hostname: string): boolean {
+  if (isLoopbackHost(hostname)) return true;
+  if (isPrivateLanHost(hostname)) return true;
+  if (hostname.endsWith('.railway.internal')) return true;
+  if (hostname.endsWith('.internal')) return true;
+  // Docker Compose short names (e.g. BACKEND_URL=http://backend:8080 copied into NEXT_PUBLIC_*).
+  if (!hostname.includes('.')) return true;
+  return false;
+}
+
 /**
  * Pure resolver (exported for unit tests).
  *
- * - Explicit absolute non-loopback `NEXT_PUBLIC_API_URL` → use it (cross-origin API).
+ * - Explicit absolute **public** `NEXT_PUBLIC_API_URL` → use it (split FE/BE).
  * - Unset / empty → same-origin `''` in the browser (Next proxies `/api` → BACKEND_URL).
  * - Loopback env + page on loopback → keep loopback API (local `next dev`).
  * - Loopback env + page on private LAN → rewrite host only (phone/LAN testing).
- * - Loopback env + page on a public host → same-origin `''` (never `https://app:8080`).
+ * - Loopback / Compose / private / `.internal` env + public page → same-origin `''`.
  */
 export function resolveApiBaseUrl(envUrl: string | undefined | null, pageOrigin: string | null): string {
   const raw = (envUrl ?? '').trim();
@@ -60,23 +77,29 @@ export function resolveApiBaseUrl(envUrl: string | undefined | null, pageOrigin:
     return '';
   }
 
-  if (!isLoopbackHost(configured.hostname)) {
+  const pageLoopback = isLoopbackHost(page.hostname);
+  const pageLan = isPrivateLanHost(page.hostname);
+  const apiUnreachableFromBrowser = isBrowserUnreachableApiHost(configured.hostname);
+
+  // Hosted / public page: never call localhost, Compose DNS, or private Railway net.
+  if (!pageLoopback && !pageLan) {
+    if (apiUnreachableFromBrowser) return '';
     return configured.origin;
   }
 
-  // Baked localhost while the UI is served from a real host.
-  if (!isLoopbackHost(page.hostname)) {
-    if (isPrivateLanHost(page.hostname)) {
-      // LAN access to `next dev`: hit API on the same machine, keep port.
-      configured.hostname = page.hostname;
-      configured.protocol = page.protocol;
-      return configured.origin;
-    }
-    // Hosted / public: use same-origin proxy instead of rewriting to page:8080.
-    return '';
+  // LAN access to `next dev`: rewrite loopback API host → phone-reachable LAN IP.
+  if (pageLan && isLoopbackHost(configured.hostname)) {
+    configured.hostname = page.hostname;
+    configured.protocol = page.protocol;
+    return configured.origin;
   }
 
-  return configured.origin || fallback;
+  // Local next ↔ local API (or explicit LAN API while on LAN).
+  if (pageLoopback || pageLan) {
+    return configured.origin || fallback;
+  }
+
+  return '';
 }
 
 export function getApiBaseUrl(): string {
@@ -87,6 +110,13 @@ export function getApiBaseUrl(): string {
   return resolveApiBaseUrl(envUrl, window.location.origin);
 }
 
+/** Join API base + path (`/api/...`). Empty base → same-origin absolute path. */
+export function apiUrl(path: string): string {
+  const base = getApiBaseUrl().replace(/\/$/, '');
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${p}`;
+}
+
 export const API_BASE_URL = {
   toString() {
     return getApiBaseUrl();
@@ -94,7 +124,49 @@ export const API_BASE_URL = {
   valueOf() {
     return getApiBaseUrl();
   },
+  [Symbol.toPrimitive]() {
+    return getApiBaseUrl();
+  },
 } as unknown as string;
+
+/** User-facing message when `fetch` cannot reach the API (network / wrong base). */
+export function formatApiUnreachableError(): string {
+  const base = getApiBaseUrl();
+  const shown = base || '(same-origin /api)';
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (!isLoopbackHost(host) && !isPrivateLanHost(host)) {
+      return (
+        `No se pudo conectar al API (base: ${shown}). ` +
+        `En Railway el browser debe usar same-origin /api: dejá NEXT_PUBLIC_API_URL vacío y redeploy del frontend. ` +
+        `BACKEND_URL solo lo usa el proxy de Next en el server.`
+      );
+    }
+  }
+  return (
+    `No se pudo conectar al API (base: ${shown}). ` +
+    `Local: levantá Express en :8080, o configurá NEXT_PUBLIC_API_URL / BACKEND_URL.`
+  );
+}
+
+/**
+ * True when the error looks like a browser network failure (not an HTTP/JSON app error).
+ * Does not treat FirebaseAuth errors as API-down.
+ */
+export function isFetchNetworkError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { name?: string; message?: string; code?: string };
+  // Firebase / auth SDK errors must surface their own message.
+  if (typeof e.code === 'string' && (e.code.startsWith('auth/') || e.code.startsWith('firebase/'))) {
+    return false;
+  }
+  const msg = e.message || '';
+  if (/failed to fetch/i.test(msg) || /networkerror/i.test(msg) || /load failed/i.test(msg)) {
+    return true;
+  }
+  // Native fetch rejection is typically TypeError("Failed to fetch").
+  return e.name === 'TypeError' && /fetch|network|load/i.test(msg);
+}
 
 /**
  * Parse a fetch Response as JSON, with a clear error when the server returned HTML
@@ -115,7 +187,7 @@ export async function parseApiJson<T = unknown>(res: Response): Promise<T> {
     throw new Error(
       `El API devolvió HTML en vez de JSON (${res.status}). ` +
         `Revisá NEXT_PUBLIC_API_URL (ahora: ${base}) o BACKEND_URL del proxy de Next. ` +
-        `El frontend no debe llamar a su propia URL para /api/*.`,
+        `En Railway dejá NEXT_PUBLIC_API_URL vacío (same-origin /api).`,
     );
   }
 
@@ -129,7 +201,7 @@ export async function parseApiJson<T = unknown>(res: Response): Promise<T> {
     throw new Error(
       `Respuesta no-JSON del API (${res.status}). ` +
         `Content-Type: ${contentType || 'desconocido'}. ` +
-        `¿NEXT_PUBLIC_API_URL apunta al backend (puerto 8080) y no al frontend?`,
+        `¿NEXT_PUBLIC_API_URL apunta al backend público o está vacío (same-origin)?`,
     );
   }
 }

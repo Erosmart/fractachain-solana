@@ -4,7 +4,13 @@
  */
 
 function isLoopbackHost(hostname) {
-  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname === '::1' ||
+    hostname === '[::1]'
+  );
 }
 
 function isPrivateLanHost(hostname) {
@@ -15,6 +21,15 @@ function isPrivateLanHost(hostname) {
     const n = Number(m[1]);
     return n >= 16 && n <= 31;
   }
+  return false;
+}
+
+function isBrowserUnreachableApiHost(hostname) {
+  if (isLoopbackHost(hostname)) return true;
+  if (isPrivateLanHost(hostname)) return true;
+  if (hostname.endsWith('.railway.internal')) return true;
+  if (hostname.endsWith('.internal')) return true;
+  if (!hostname.includes('.')) return true;
   return false;
 }
 
@@ -46,31 +61,43 @@ function resolveApiBaseUrl(envUrl, pageOrigin) {
     return '';
   }
 
-  if (!isLoopbackHost(configured.hostname)) {
+  const pageLoopback = isLoopbackHost(page.hostname);
+  const pageLan = isPrivateLanHost(page.hostname);
+  const apiUnreachableFromBrowser = isBrowserUnreachableApiHost(configured.hostname);
+
+  if (!pageLoopback && !pageLan) {
+    if (apiUnreachableFromBrowser) return '';
     return configured.origin;
   }
 
-  if (!isLoopbackHost(page.hostname)) {
-    if (isPrivateLanHost(page.hostname)) {
-      configured.hostname = page.hostname;
-      configured.protocol = page.protocol;
-      return configured.origin;
-    }
-    return '';
+  if (pageLan && isLoopbackHost(configured.hostname)) {
+    configured.hostname = page.hostname;
+    configured.protocol = page.protocol;
+    return configured.origin;
   }
 
-  return configured.origin || fallback;
+  if (pageLoopback || pageLan) {
+    return configured.origin || fallback;
+  }
+
+  return '';
 }
 
 const cases = [
   // Hosted FE + baked localhost → same-origin proxy (NOT page:8080)
   ['http://localhost:8080', 'https://app.railway.app', ''],
   ['http://127.0.0.1:8080', 'https://fractachain.example', ''],
+  ['http://0.0.0.0:8080', 'https://app.railway.app', ''],
+  // Compose / private Railway host copied into NEXT_PUBLIC_* → same-origin
+  ['http://backend:8080', 'https://app.railway.app', ''],
+  ['http://express.railway.internal:8080', 'https://app.railway.app', ''],
+  ['http://10.0.1.5:8080', 'https://app.railway.app', ''],
   // Empty env → same-origin
   ['', 'https://app.railway.app', ''],
   [undefined, 'http://localhost:3000', ''],
   // Explicit public API
   ['https://api.example.com', 'https://app.railway.app', 'https://api.example.com'],
+  ['https://backend-production-410a3.up.railway.app', 'https://app.railway.app', 'https://backend-production-410a3.up.railway.app'],
   // Local next ↔ local API
   ['http://localhost:8080', 'http://localhost:3000', 'http://localhost:8080'],
   // LAN phone testing
