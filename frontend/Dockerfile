@@ -35,7 +35,23 @@ ENV NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=$NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
 ENV NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=$NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
 ENV NEXT_PUBLIC_FIREBASE_APP_ID=$NEXT_PUBLIC_FIREBASE_APP_ID
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+# Never bake loopback / Compose / private hosts into the client bundle.
+# Railway often injects service env vars at build time; clear values the browser cannot call.
+RUN set -eu; \
+  u="${NEXT_PUBLIC_API_URL:-}"; \
+  if [ -n "$u" ]; then \
+    host="$(node -e "try{process.stdout.write(new URL(process.argv[1]).hostname)}catch{process.stdout.write('')}" "$u")"; \
+    case "$host" in \
+      localhost|127.0.0.1|0.0.0.0|"::1"|"[::1]"|"") \
+        echo "[Dockerfile] clearing non-browser NEXT_PUBLIC_API_URL=$u"; export NEXT_PUBLIC_API_URL= ;; \
+      *.railway.internal|*.internal) \
+        echo "[Dockerfile] clearing private NEXT_PUBLIC_API_URL=$u"; export NEXT_PUBLIC_API_URL= ;; \
+      *.*) ;; \
+      *) \
+        echo "[Dockerfile] clearing Compose-hostname NEXT_PUBLIC_API_URL=$u"; export NEXT_PUBLIC_API_URL= ;; \
+    esac; \
+  fi; \
+  npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app

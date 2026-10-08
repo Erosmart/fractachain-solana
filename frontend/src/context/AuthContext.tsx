@@ -1,7 +1,12 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { API_BASE_URL, parseApiJson } from '../lib/api';
+import {
+  apiUrl,
+  formatApiUnreachableError,
+  isFetchNetworkError,
+  parseApiJson,
+} from '../lib/api';
 import { isKycRequired } from '../lib/devnetMode';
 import { signAndRelay } from '../lib/selfCustody';
 import { tClient } from '../lib/i18n';
@@ -124,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const saved = localStorage.getItem('fc_auth_token');
     if (!saved) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      const res = await fetch(apiUrl('/api/auth/me'), {
         headers: { Authorization: `Bearer ${saved}` },
       });
       const data = await parseApiJson<{ success?: boolean; user?: unknown }>(res);
@@ -163,28 +168,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithGoogle = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Firebase errors must not be masked as "backend down".
       const { loginWithFirebaseGoogle } = await import('../lib/firebase');
       const fbData = await loginWithFirebaseGoogle();
-      const res = await fetch(`${API_BASE_URL}/api/auth/firebase`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          uid: fbData.uid,
-          email: fbData.email,
-          displayName: fbData.displayName,
-          photoURL: fbData.photoURL,
-          idToken: fbData.idToken,
-        }),
-      });
+      let res: Response;
+      try {
+        res = await fetch(apiUrl('/api/auth/firebase'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: fbData.uid,
+            email: fbData.email,
+            displayName: fbData.displayName,
+            photoURL: fbData.photoURL,
+            idToken: fbData.idToken,
+          }),
+        });
+      } catch (netErr) {
+        if (isFetchNetworkError(netErr)) throw new Error(formatApiUnreachableError());
+        throw netErr;
+      }
       const data = await parseApiJson<{ success?: boolean; user?: unknown; token?: string; message?: string }>(res);
       if (!data.success || !data.user || !data.token) throw new Error(data.message || tClient('err.loginFail'));
       const u = normalize(data.user);
       applySession(data.token, data.user);
       return u;
-    } catch (err: any) {
-      if (err?.name === 'TypeError' || /failed to fetch/i.test(err?.message || '')) {
-        throw new Error(tClient('err.apiDown'));
-      }
+    } catch (err: unknown) {
+      if (isFetchNetworkError(err)) throw new Error(formatApiUnreachableError());
       throw err;
     } finally {
       setIsLoading(false);
@@ -196,11 +206,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { solanaLoginPayload } = await import('../lib/solanaWallet');
       const payload = await solanaLoginPayload();
-      const res = await fetch(`${API_BASE_URL}/api/auth/wallet-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      let res: Response;
+      try {
+        res = await fetch(apiUrl('/api/auth/wallet-login'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } catch (netErr) {
+        if (isFetchNetworkError(netErr)) throw new Error(formatApiUnreachableError());
+        throw netErr;
+      }
       const data = await parseApiJson<{ success?: boolean; user?: unknown; token?: string; message?: string }>(res);
       if (!res.ok || !data.success || !data.user || !data.token) throw new Error(data.message || tClient('err.walletLogin'));
       const u = normalize(data.user);
@@ -209,10 +225,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // dispara el grant. Sin ella la wallet no puede recibir USDC.
       await ensureUsdcReady(data.token).catch(() => undefined);
       return u;
-    } catch (err: any) {
-      if (err?.name === 'TypeError' || /failed to fetch/i.test(err?.message || '')) {
-        throw new Error(tClient('err.apiDown'));
-      }
+    } catch (err: unknown) {
+      if (isFetchNetworkError(err)) throw new Error(formatApiUnreachableError());
       throw err;
     } finally {
       setIsLoading(false);
@@ -222,11 +236,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithEmail = useCallback(async (email: string, password: string, name?: string) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name }),
-      });
+      let res: Response;
+      try {
+        res = await fetch(apiUrl('/api/auth/email'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, name }),
+        });
+      } catch (netErr) {
+        if (isFetchNetworkError(netErr)) throw new Error(formatApiUnreachableError());
+        throw netErr;
+      }
       const data = await parseApiJson<{ success?: boolean; user?: unknown; token?: string; message?: string }>(res);
       if (!res.ok || !data.success || !data.token) throw new Error(data.message || tClient('err.loginGeneric'));
       const u = normalize(data.user);
@@ -235,10 +255,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // self-custody firma la creación de la ATA una sola vez si le falta.
       if (u.publicKey && u.custodyMode) await ensureUsdcReady(data.token).catch(() => undefined);
       return u;
-    } catch (err: any) {
-      if (err?.name === 'TypeError' || /failed to fetch/i.test(err?.message || '')) {
-        throw new Error(tClient('err.apiDown'));
-      }
+    } catch (err: unknown) {
+      if (isFetchNetworkError(err)) throw new Error(formatApiUnreachableError());
       throw err;
     } finally {
       setIsLoading(false);
@@ -249,7 +267,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!token) throw new Error(tClient('err.signIn'));
     const { solanaLinkPayload } = await import('../lib/solanaWallet');
     const payload = await solanaLinkPayload();
-    const res = await fetch(`${API_BASE_URL}/api/auth/wallet/link`, {
+    const res = await fetch(apiUrl('/api/auth/wallet/link'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
@@ -263,7 +281,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const chooseCustody = useCallback(async (mode: 'CUSTODIAL' | 'SELF', publicKey?: string) => {
     if (!token) throw new Error(tClient('err.signIn'));
-    const res = await fetch(`${API_BASE_URL}/api/auth/wallet`, {
+    const res = await fetch(apiUrl('/api/auth/wallet'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ mode, publicKey }),
@@ -278,7 +296,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const submitKyc = useCallback(async (payload: { legalName: string; cuit: string; selfieDataUrl?: string; email?: string }) => {
     if (!token) throw new Error(tClient('err.signIn'));
-    const res = await fetch(`${API_BASE_URL}/api/kyc/onboard`, {
+    const res = await fetch(apiUrl('/api/kyc/onboard'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
@@ -304,7 +322,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw err;
       });
     }
-    const res = await fetch(`${API_BASE_URL}/api/listings/${listingId}/trustline`, {
+    const res = await fetch(apiUrl(`/api/listings/${listingId}/trustline`), {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -315,7 +333,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const claimTokens = useCallback(async (listingId: string) => {
     if (!token) throw new Error(tClient('err.signIn'));
-    const res = await fetch(`${API_BASE_URL}/api/listings/${listingId}/claim`, {
+    const res = await fetch(apiUrl(`/api/listings/${listingId}/claim`), {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -327,7 +345,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const distributeTokens = useCallback(async (listingId: string) => {
     if (!token) throw new Error(tClient('err.signIn'));
-    const res = await fetch(`${API_BASE_URL}/api/listings/${listingId}/distribute`, {
+    const res = await fetch(apiUrl(`/api/listings/${listingId}/distribute`), {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -339,7 +357,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const finalizeOffering = useCallback(async (listingId: string) => {
     if (!token) throw new Error(tClient('err.signIn'));
-    const res = await fetch(`${API_BASE_URL}/api/listings/${listingId}/finalize`, {
+    const res = await fetch(apiUrl(`/api/listings/${listingId}/finalize`), {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -359,7 +377,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data?.user) applySession(token, data.user);
       return data;
     }
-    const res = await fetch(`${API_BASE_URL}/api/listings/${listingId}/refund`, {
+    const res = await fetch(apiUrl(`/api/listings/${listingId}/refund`), {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -371,7 +389,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const claimDividends = useCallback(async (listingId: string) => {
     if (!token) throw new Error(tClient('err.signIn'));
-    const res = await fetch(`${API_BASE_URL}/api/listings/${listingId}/dividends/claim`, {
+    const res = await fetch(apiUrl(`/api/listings/${listingId}/dividends/claim`), {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
