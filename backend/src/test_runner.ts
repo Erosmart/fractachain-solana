@@ -37,6 +37,7 @@ import { InvestorType } from './solana/program';
 import { mapSolanaError } from './solana/tx';
 import { accountDiscriminator } from './solana/borsh';
 import { decodePlatform, decodeContribution, decodeOpa } from './solana/offering_state';
+import { isProgramDeployed, PLACEHOLDER_PROGRAM_ID } from './solana/deployment';
 
 console.log('=== INICIANDO SUITE DE PRUEBAS DE FRACTACHAIN BACKEND ===');
 
@@ -194,12 +195,20 @@ assert(
   'Una licitación sandbox abierta no la cierra el settlement automático',
 );
 assert(
-  settlementAction({ status: 'CLOSED_SUCCESS', onChain: true }) === 'settle_holders',
-  'Cerrada con éxito acredita las unidades sin que el inversor reclame',
+  settlementAction({ status: 'CLOSED_SUCCESS', onChain: true }) === 'settle_on_chain',
+  'Cerrada con éxito on-chain reintenta distribute() (no sandbox ledger)',
 );
 assert(
-  settlementAction({ status: 'CLOSED_FAILED', onChain: true }) === 'skip',
-  'Cerrada fallida no acredita nada (el inversor usa refund)',
+  settlementAction({ status: 'CLOSED_FAILED', onChain: true }) === 'settle_on_chain',
+  'Cerrada fallida on-chain reintenta refund() en el sweep',
+);
+assert(
+  settlementAction({ status: 'CLOSED_SUCCESS', onChain: false }) === 'settle_holders',
+  'Sandbox CLOSED_SUCCESS sigue acreditando en ledger local',
+);
+assert(
+  settlementAction({ status: 'CLOSED_FAILED', onChain: false }) === 'skip',
+  'Sandbox CLOSED_FAILED no acredita (refund path)',
 );
 
 console.log('\n[9] Probando que ninguna respuesta filtre material secreto:');
@@ -415,6 +424,27 @@ console.log('\n[14] Backend↔program wiring helpers (errors, legal, KYC type, l
     opaDisc = /Not an Opa/.test(String(e?.message || e));
   }
   assert(opaDisc, 'decodeOpa exige discriminator');
+}
+
+console.log('\n[15] isProgramDeployed rechaza placeholder + settlement on-chain closed:');
+{
+  const prevDeployed = process.env.FRACTACHAIN_PROGRAM_DEPLOYED;
+  const prevId = process.env.FRACTACHAIN_PROGRAM_ID;
+  process.env.FRACTACHAIN_PROGRAM_DEPLOYED = 'true';
+  process.env.FRACTACHAIN_PROGRAM_ID = PLACEHOLDER_PROGRAM_ID;
+  assert(
+    isProgramDeployed() === false,
+    'DEPLOYED=true con program id placeholder → sandbox',
+  );
+  process.env.FRACTACHAIN_PROGRAM_ID = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+  assert(
+    isProgramDeployed() === true,
+    'DEPLOYED=true con program id real → live',
+  );
+  if (prevDeployed == null) delete process.env.FRACTACHAIN_PROGRAM_DEPLOYED;
+  else process.env.FRACTACHAIN_PROGRAM_DEPLOYED = prevDeployed;
+  if (prevId == null) delete process.env.FRACTACHAIN_PROGRAM_ID;
+  else process.env.FRACTACHAIN_PROGRAM_ID = prevId;
 }
 
 console.log(`\n=== RESUMEN: ${testsPassed} PASADOS, ${testsFailed} FALLIDOS ===\n`);

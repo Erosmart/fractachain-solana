@@ -78,6 +78,19 @@ export async function ensureInvestorVerifiedForOps(wallet: PublicKey): Promise<v
   await verifyInvestorOnChain(wallet);
 }
 
+/**
+ * `distribute` needs an Investor account (PDA constraint) but allows expired /
+ * revoked KYC — units deliver frozen. Do not re-run verify or require live KYC.
+ */
+export async function ensureInvestorPdaForDistribute(wallet: PublicKey): Promise<void> {
+  const snap = await fetchInvestor(wallet).catch(() => null);
+  if (snap) return;
+  if (isKycEnforced()) {
+    throw new Error('Investor PDA requerido para distribute (KYC on-chain ausente)');
+  }
+  await verifyInvestorOnChain(wallet);
+}
+
 export async function revokeInvestorOnChain(wallet: PublicKey): Promise<string> {
   const admin = adminKeypair();
   return sendIxs(admin, [], [ixRevokeInvestor(admin.publicKey, wallet)]).catch((e) => {

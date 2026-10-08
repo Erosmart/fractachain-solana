@@ -123,7 +123,6 @@ export async function settleOnChainContributors(
  * best-effort: settlement must not fail because the venue did.
  */
 export async function openSecondaryMarket(listing: Listing): Promise<string | null> {
-  if (listing.manifestMarket) return listing.manifestMarket;
   const snap = await fetchOffering(listing.id);
   if (!snap || snap.state !== 'Successful') return null;
   // Prefer the Offering's payment mint (set at open_offering) over env — same mint
@@ -131,11 +130,18 @@ export async function openSecondaryMarket(listing: Listing): Promise<string | nu
   const quote =
     !snap.paymentMint.equals(PublicKey.default) ? snap.paymentMint : usdcMint();
   if (!quote) throw new Error('Falta el mint USDC configurado');
-  const market = await createMarket(snap.rwaMint, quote);
-  const baseVault = await vaultAddress(new PublicKey(market.market), snap.rwaMint);
+
+  // Persist market address before vault thaw so a thaw failure does not orphan
+  // a newly created market on the next retry (idempotent authorize).
+  let marketAddr = listing.manifestMarket || null;
+  if (!marketAddr) {
+    const market = await createMarket(snap.rwaMint, quote);
+    marketAddr = market.market;
+    setListingMarket(listing.id, marketAddr);
+  }
+  const baseVault = await vaultAddress(new PublicKey(marketAddr), snap.rwaMint);
   await authorizeVault(listing.id, baseVault);
-  setListingMarket(listing.id, market.market);
-  return market.market;
+  return marketAddr;
 }
 
 /**
@@ -188,19 +194,31 @@ export async function finalizeListedOffering(listingId: string) {
   }
 
   const result = await finalizeOnChain(listing.id, adminKeypair());
-  const snapAfter = await fetchOffering(listing.id);
-  const success = snapAfter?.state === 'Successful';
-  const raised = snapAfter ? unitsToUsdc(snapAfter.totalRaised) : listing.raisedUsdc;
+  let snapAfter = await fetchOffering(listing.id);
+  if (!snapAfter) {
+    // RPC lag after a confirmed finalize — retry once before giving up.
+    await new Promise((r) => setTimeout(r, 800));
+    snapAfter = await fetchOffering(listing.id);
+  }
+  if (!snapAfter || (snapAfter.state !== 'Successful' && snapAfter.state !== 'Failed')) {
+    // Never invent CLOSED_FAILED when the snapshot is missing — that enables
+    // refund() against a Successful offering and blocks distribute/claim.
+    throw new Error(
+      `finalize() envió ${result} pero no se pudo leer Successful/Failed on-chain; reintentá el cierre`,
+    );
+  }
+  const success = snapAfter.state === 'Successful';
+  const raised = unitsToUsdc(snapAfter.totalRaised);
   const updated = markListingClosed(
     listing.id,
     success ? 'CLOSED_SUCCESS' : 'CLOSED_FAILED',
     raised,
     {
       finalizeHash: result,
-      proceedsPaidTo: snapAfter?.fiduciary.toBase58(),
+      proceedsPaidTo: snapAfter.fiduciary.toBase58(),
     },
   );
-  const settlements = snapAfter ? await settleOnChainContributors(updated, snapAfter) : [];
+  const settlements = await settleOnChainContributors(updated, snapAfter);
   const marketAddress = success
     ? await openSecondaryMarket(getListing(listing.id)!).catch((err: any) => {
         console.warn(`[settlement] market for ${listing.id}:`, err?.message || err);
@@ -212,7 +230,7 @@ export async function finalizeListedOffering(listingId: string) {
     settlements,
     onChain: {
       ...listingChainMeta(updated),
-      ...(snapAfter ? snapshotToApi(snapAfter) : {}),
+      ...snapshotToApi(snapAfter),
       market: marketAddress,
       hash: result,
       explorer: explorerTx(result),
@@ -242,6 +260,14 @@ export async function autoFinalizeIfDue(listingId: string) {
     if (action === 'settle_holders') {
       return { ...listing, settlements: await settleHolders(listing) };
     }
+    if (action === 'settle_on_chain') {
+      const snap = await fetchOffering(listing.id);
+      if (!snap || (snap.state !== 'Successful' && snap.state !== 'Failed')) return null;
+      return {
+        ...listing,
+        settlements: await settleOnChainContributors(listing, snap),
+      };
+    }
     const snap = await fetchOffering(listing.id);
     if (!snap) return null;
     const closed = snap.state === 'Successful' || snap.state === 'Failed';
@@ -257,7 +283,11 @@ export async function autoFinalizeIfDue(listingId: string) {
 /** Settles offerings whose deadline passed while nobody was looking. */
 export async function sweepDueOfferings() {
   for (const listing of listListings()) {
-    if (listing.status === 'LISTED' || listing.status === 'CLOSED_SUCCESS') {
+    if (
+      listing.status === 'LISTED' ||
+      listing.status === 'CLOSED_SUCCESS' ||
+      listing.status === 'CLOSED_FAILED'
+    ) {
       await autoFinalizeIfDue(listing.id);
     }
   }

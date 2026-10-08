@@ -42,9 +42,12 @@ export function unitsToUsdc(units: bigint | number): number {
   return Number(units) / USDC_UNITS;
 }
 
-export async function usdcBalance(owner: PublicKey | string): Promise<number> {
+export async function usdcBalance(
+  owner: PublicKey | string,
+  mintOverride?: PublicKey | null,
+): Promise<number> {
   const pk = typeof owner === 'string' ? new PublicKey(owner) : owner;
-  const mint = usdcMint();
+  const mint = mintOverride || usdcMint();
   if (!mint) return 0;
   try {
     const ata = getAssociatedTokenAddressSync(mint, pk, true, TOKEN_PROGRAM_ID);
