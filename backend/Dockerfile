@@ -1,14 +1,15 @@
-# Build from the repo root (required — needs deployments/ outside backend/):
-#   docker build -f backend/Dockerfile .
-# Railway: Root Directory EMPTY (or /), Dockerfile path = backend/Dockerfile
-#   Config-as-code: backend/railway.json
-# Do NOT set Root Directory to backend/ — that makes COPY backend/* look for
-# backend/backend/* and fails with "/backend/scripts: not found".
+# Build context = backend/ (Railway Root Directory = backend):
+#   docker build -f backend/Dockerfile backend/
+# Compose: context ./backend, dockerfile Dockerfile
+# Config-as-code: backend/railway.json → dockerfilePath "Dockerfile"
+#
+# Repo-root context (docker build -f backend/Dockerfile .) will NOT work —
+# paths here are relative to backend/, not the monorepo root.
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY backend/package.json backend/package-lock.json ./
+COPY package.json package-lock.json ./
 RUN npm ci || npm install
-COPY backend/ ./
+COPY . ./
 RUN npm run build \
   && test -f dist/pg_restore.js \
   && test -d data
@@ -20,17 +21,14 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates
 ENV NODE_ENV=production
 ENV PORT=8080
-COPY backend/package.json backend/package-lock.json ./
+COPY package.json package-lock.json ./
 RUN npm ci --omit=dev || npm install --omit=dev
 COPY --from=builder /app/dist ./dist
-# solana/connection.ts resolves deployments/ three levels above dist/solana/ → /deployments
+# connection.ts resolves deployments/ three levels above dist/solana → /deployments
+# Source is backend/deployments/devnet.json (vendored; parent ../deployments is outside context).
 COPY --chown=node:node deployments/devnet.json /deployments/devnet.json
-# Seed JSON from builder (via COPY backend/ ./). Avoid context COPY of
-# backend/data|scripts — Railway: "failed to compute cache key: /backend/scripts: not found"
-# (scripts are tracked on main; likely Root Directory=backend/ or thin context).
 COPY --from=builder --chown=node:node /app/data ./data
-# CMD needs scripts/pg_restore.js — ship it from compiled dist (src/pg_restore.ts),
-# not a context COPY of backend/scripts.
+# Prefer compiled restore; keep scripts/pg_restore.js path for CMD.
 RUN mkdir -p scripts data/selfies \
   && cp dist/pg_restore.js scripts/pg_restore.js \
   && chown -R node:node /app

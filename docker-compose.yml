@@ -10,8 +10,9 @@
 services:
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      # Matches Railway Root Directory = backend/ (see backend/Dockerfile).
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     env_file:
