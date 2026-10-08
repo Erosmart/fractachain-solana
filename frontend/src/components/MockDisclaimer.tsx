@@ -17,7 +17,7 @@ export default function MockDisclaimer({
         <p className="font-display font-bold">{t('mock.title')}</p>
         <p className="mt-1 mock-disclaimer-body">
           {t('mock.body', { product })}{' '}
-          <Link href="/demo/licitaciones" className="font-bold underline underline-offset-2">
+          <Link href="/mercado" className="font-bold underline underline-offset-2">
             {t('mock.listing')}
           </Link>
           {t('mock.tail')}

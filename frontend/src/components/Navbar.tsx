@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Layers,
   LayoutDashboard,
-  FlaskConical,
   ShieldCheck,
   BookOpen,
   FilePlus2,
@@ -37,7 +36,6 @@ export default function Navbar() {
           { href: '/admin/kyc', label: t('acct.navAdmin'), icon: ShieldCheck },
         ]
       : []),
-    { href: '/demo', label: t('acct.navDemo'), icon: FlaskConical },
   ];
 
   const linkActive = (href: string) =>

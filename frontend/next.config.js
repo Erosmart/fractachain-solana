@@ -27,13 +27,14 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
-  // Legacy demo paths at the root. `/orderbook` is live now — do not redirect it.
+  // Legacy root paths → real routes (the demo was removed).
   async redirects() {
-    return ['emision', 'licitaciones', 'portfolio'].map((p) => ({
-      source: `/${p}`,
-      destination: `/demo/${p}`,
-      permanent: false,
-    }));
+    return [
+      { source: '/emision', destination: '/admin/emision', permanent: false },
+      { source: '/licitaciones', destination: '/mercado', permanent: false },
+      { source: '/portfolio', destination: '/dashboard', permanent: false },
+      { source: '/demo/:path*', destination: '/mercado', permanent: false },
+    ];
   },
   async rewrites() {
     const backend = backendProxyTarget();
