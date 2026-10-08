@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Copy, ExternalLink, KeyRound, ShieldCheck } from 'lucide-react';
+import { Coins, Copy, ExternalLink, KeyRound, ShieldCheck } from 'lucide-react';
 import SoftKycNotice from '../../components/SoftKycNotice';
 import { useAuth } from '../../context/AuthContext';
 import { useI18n } from '../../context/I18nContext';
 import { API_BASE_URL, bearerHeaders } from '../../lib/api';
 import { explorerAddress } from '../../lib/explorer';
+import { isDevnetSoftKyc } from '../../lib/devnetMode';
+import { ensureUsdcReady } from '../../lib/usdc';
 
 type Position = {
   listingId: string;
@@ -34,6 +36,7 @@ export default function DashboardPage() {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [onChain, setOnChain] = useState<boolean | null>(null);
   const [copied, setCopied] = useState(false);
+  const [funding, setFunding] = useState<'idle' | 'working' | 'done' | 'fail'>('idle');
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
@@ -54,6 +57,18 @@ export default function DashboardPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const requestFunds = useCallback(async () => {
+    if (!token || funding === 'working') return;
+    setFunding('working');
+    try {
+      await ensureUsdcReady(token);
+      setFunding('done');
+      await load();
+    } catch {
+      setFunding('fail');
+    }
+  }, [token, funding, load]);
 
   if (!user) return null;
   const custodial = user.custodyMode === 'CUSTODIAL';
@@ -117,6 +132,20 @@ export default function DashboardPage() {
               <p className="font-lcd text-lg">{portfolio ? fmt(portfolio.usdcOnChain) : '…'}</p>
             </div>
           </div>
+          {isDevnetSoftKyc() && user.publicKey && (
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => void requestFunds()}
+                disabled={funding === 'working'}
+                className="flex items-center gap-1.5 rounded-full bg-brand-accent px-4 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+              >
+                <Coins size={13} /> {funding === 'working' ? t('acct.faucetWorking') : t('acct.faucetCta')}
+              </button>
+              {funding === 'done' && <p className="mt-1.5 text-xs text-brand-accent">{t('acct.faucetDone')}</p>}
+              {funding === 'fail' && <p className="mt-1.5 text-xs text-red-700">{t('acct.faucetFail')}</p>}
+            </div>
+          )}
         </div>
 
         <div className="rounded-2xl border border-brand-border bg-brand-card p-5 shadow-sm">
