@@ -1,6 +1,6 @@
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
 import { autoFaucetEnabled, getConnection, SOLANA_CLUSTER } from './connection';
-import { isSolanaPublicKey } from './keys';
+import { adminKeypair, hasAdminSecret, isSolanaPublicKey } from './keys';
 
 /**
  * Devnet/localnet wallet hydration — replaces Stellar friendbot + USDC
@@ -27,8 +27,27 @@ export async function ensureSolBalance(pubkey: PublicKey, opts?: { force?: boole
   if (balance >= LAMPORTS_MIN) {
     return { airdropped: false, balance };
   }
+  const need = Math.max(0, LAMPORTS_TARGET - balance);
+  // Prefer a transfer from the platform admin wallet: the public devnet
+  // faucet rate-limits shared IPs (Railway egress) with 429s.
+  if (hasAdminSecret()) {
+    try {
+      const admin = adminKeypair();
+      const tx = new Transaction().add(
+        SystemProgram.transfer({ fromPubkey: admin.publicKey, toPubkey: pubkey, lamports: need }),
+      );
+      tx.feePayer = admin.publicKey;
+      tx.recentBlockhash = (await conn.getLatestBlockhash()).blockhash;
+      tx.sign(admin);
+      const sig = await conn.sendRawTransaction(tx.serialize());
+      await conn.confirmTransaction(sig, 'confirmed');
+      return { airdropped: true, balance: await conn.getBalance(pubkey) };
+    } catch (err) {
+      console.warn('[devnet] transfer SOL desde admin falló:', (err as Error)?.message);
+    }
+  }
   try {
-    const sig = await conn.requestAirdrop(pubkey, Math.max(0, LAMPORTS_TARGET - balance));
+    const sig = await conn.requestAirdrop(pubkey, need);
     await conn.confirmTransaction(sig, 'confirmed');
     return { airdropped: true, balance: await conn.getBalance(pubkey) };
   } catch (err) {
