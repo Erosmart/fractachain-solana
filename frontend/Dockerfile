@@ -1,6 +1,10 @@
-# Build from the repo root:
-#   docker build -f frontend/Dockerfile .
-# Railway: empty Root Directory, Dockerfile path = frontend/Dockerfile
+# Build context = frontend/ (Railway Root Directory = frontend):
+#   docker build -f frontend/Dockerfile frontend/
+# Compose: context ./frontend, dockerfile Dockerfile
+# Config-as-code: frontend/railway.json → dockerfilePath "Dockerfile"
+#
+# Repo-root context (docker build -f frontend/Dockerfile .) will NOT work —
+# paths here are relative to frontend/, not the monorepo root.
 #
 # Prefer same-origin `/api` + **runtime** BACKEND_URL (App Router proxy routes).
 # Only set NEXT_PUBLIC_API_URL at build time when the browser must call a
@@ -11,9 +15,9 @@
 # hostname does not resolve on Railway (getaddrinfo ENOTFOUND backend).
 FROM node:22-alpine AS builder
 WORKDIR /app
-COPY frontend/package.json frontend/package-lock.json ./
+COPY package.json package-lock.json ./
 RUN npm ci || npm install
-COPY frontend/ ./
+COPY . ./
 RUN mkdir -p public
 # Empty default → browser uses same-origin proxy (see src/app/api/[...path]).
 ARG NEXT_PUBLIC_API_URL=
