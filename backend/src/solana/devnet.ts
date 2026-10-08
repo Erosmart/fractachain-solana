@@ -28,8 +28,15 @@ export async function ensureSolBalance(pubkey: PublicKey, opts?: { force?: boole
     return { airdropped: false, balance };
   }
   const need = Math.max(0, LAMPORTS_TARGET - balance);
-  // Prefer a transfer from the platform admin wallet: the public devnet
-  // faucet rate-limits shared IPs (Railway egress) with 429s.
+  try {
+    const sig = await conn.requestAirdrop(pubkey, need);
+    await conn.confirmTransaction(sig, 'confirmed');
+    return { airdropped: true, balance: await conn.getBalance(pubkey) };
+  } catch (err) {
+    // Devnet faucet rate-limits shared IPs (Railway egress) with 429s —
+    // fall back to a transfer from the platform admin wallet.
+    console.warn('[devnet] airdrop falló:', (err as Error)?.message);
+  }
   if (hasAdminSecret()) {
     try {
       const admin = adminKeypair();
@@ -46,15 +53,7 @@ export async function ensureSolBalance(pubkey: PublicKey, opts?: { force?: boole
       console.warn('[devnet] transfer SOL desde admin falló:', (err as Error)?.message);
     }
   }
-  try {
-    const sig = await conn.requestAirdrop(pubkey, need);
-    await conn.confirmTransaction(sig, 'confirmed');
-    return { airdropped: true, balance: await conn.getBalance(pubkey) };
-  } catch (err) {
-    // Devnet faucet exhaustion — soft-fail so the UI keeps working.
-    console.warn('[devnet] airdrop falló:', (err as Error)?.message);
-    return { airdropped: false, balance };
-  }
+  return { airdropped: false, balance };
 }
 
 export function assertWalletAddress(value: string): PublicKey {
