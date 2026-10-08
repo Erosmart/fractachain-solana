@@ -40,8 +40,9 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      # Matches Railway Root Directory = frontend/ (see frontend/Dockerfile).
+      context: ./frontend
+      dockerfile: Dockerfile
       args:
         # Empty → same-origin /api proxy. Set only for a separate public API URL.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
