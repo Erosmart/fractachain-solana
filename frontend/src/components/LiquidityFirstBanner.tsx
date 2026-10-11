@@ -40,9 +40,15 @@ export default function LiquidityFirstBanner() {
           ))}
         </div>
         <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-3 border-t border-black/10 pt-4">
-          <span className="text-xs text-neutral-500 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 shrink-0" /> Argentina Builder Challenge
-          </span>
+          <a
+            href="https://x.com/TheBAFNetwork/status/2106098242924535990"
+            target="_blank"
+            rel="noreferrer"
+            title="Ganadores del Argentina Builder Challenge — BAF Network (min 17:52)"
+            className="text-xs text-neutral-500 flex items-center gap-2 hover:text-black hover:underline underline-offset-2"
+          >
+            <Sparkles className="w-4 h-4 shrink-0" /> {messages.liquidity.builderChallenge}
+          </a>
           <div className="flex flex-wrap gap-2 sm:gap-3">
             <Link href="/orderbook" className="flex-1 sm:flex-none justify-center px-5 py-2.5 btn-lcd btn-lcd-solid text-xs">
               {messages.nav.orderbook} <ArrowRight className="w-3.5 h-3.5" />

@@ -169,6 +169,7 @@ const es = {
       ['OPA on-chain', 'OPA al 50% y squeeze-out al 95%: operá en la blockchain con las mismas reglas y seguridad que en un mercado tradicional.'],
     ],
     burst: 'Burst loan',
+    builderChallenge: 'Ganadores del Argentina Builder Challenge',
   },
   partners: {
     kicker: 'Building blocks',
@@ -1275,6 +1276,7 @@ const en: Messages = {
       ['On-chain tender', 'Tender offer at 50%, squeeze-out at 95%: trade on-chain with the same rules and security as a traditional market.'],
     ],
     burst: 'Burst loan',
+    builderChallenge: 'Argentina Builder Challenge winners',
   },
   partners: {
     kicker: 'Building blocks',
