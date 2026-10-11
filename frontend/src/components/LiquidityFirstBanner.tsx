@@ -44,7 +44,7 @@ export default function LiquidityFirstBanner() {
             href="https://x.com/TheBAFNetwork/status/2106098242924535990"
             target="_blank"
             rel="noreferrer"
-            title="Ganadores del Argentina Builder Challenge — BAF Network (min 17:52)"
+            title="Argentina Builder Challenge winners — BAF Network (min 17:52)"
             className="text-xs text-neutral-500 flex items-center gap-2 hover:text-black hover:underline underline-offset-2"
           >
             <Sparkles className="w-4 h-4 shrink-0" /> {messages.liquidity.builderChallenge}

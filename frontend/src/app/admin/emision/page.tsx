@@ -13,7 +13,7 @@ const empty = {
   tradeName: '',
   cuit: '',
   jurisdiction: 'Argentina',
-  sector: 'Energía',
+  sector: 'Energy',
   ticker: '',
   tokenTicker: '',
   isin: '',
@@ -477,7 +477,7 @@ function IssuanceInner() {
                   disabled={Boolean(busy)}
                   className="px-3 py-2 rounded-xl bg-black text-white text-xs font-bold disabled:opacity-40"
                 >
-                  {busy === `${l.id}:market` ? '…' : 'Publicar mercado'}
+                  {busy === `${l.id}:market` ? '…' : t('admIss.publishMarket')}
                 </button>
               )}
               <a href={`/mercado/${l.id}`} className="px-3 py-2 text-xs font-bold underline">

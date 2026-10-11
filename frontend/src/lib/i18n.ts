@@ -745,6 +745,7 @@ const es = {
     saveSettle: 'Guardar cuándo se reparte',
     finalizeOnchain: 'Finalizar on-chain (hard cap o deadline)',
     closeNow: 'Cerrar ahora (mínimo {n} USDC)',
+    publishMarket: 'Publicar mercado',
     publicPage: 'Ver ficha pública',
     payDividend: 'Pagar dividendo',
     proRata: 'USDC, pro-rata entre tenedores',
@@ -1851,6 +1852,7 @@ const en: Messages = {
     saveSettle: 'Save distribution timing',
     finalizeOnchain: 'Finalize on-chain (hard cap or deadline)',
     closeNow: 'Close now (minimum {n} USDC)',
+    publishMarket: 'Publish market',
     publicPage: 'View public page',
     payDividend: 'Pay dividend',
     proRata: 'USDC, pro-rata across holders',
@@ -2234,10 +2236,10 @@ function lookupIn(messages: Messages, key: string): string | undefined {
 
 /**
  * Locale-aware translate for non-React modules (errors thrown in lib code).
- * Reads the same fc_lang localStorage/cookie the I18nContext uses; ES by default.
+ * Reads the same fc_lang localStorage/cookie the I18nContext uses; EN by default.
  */
 export function tClient(key: string, vars?: Record<string, string | number>): string {
-  let locale: Locale = 'es';
+  let locale: Locale = 'en';
   if (typeof window !== 'undefined') {
     const saved = window.localStorage.getItem('fc_lang');
     const cookie = document.cookie.match(/(?:^|; )fc_lang=(\w+)/)?.[1];
