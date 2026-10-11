@@ -63,7 +63,7 @@ export default function HomePage() {
           <div className="flex w-full flex-col sm:flex-row sm:flex-wrap lg:flex-nowrap items-stretch sm:items-center justify-center gap-2.5 pt-1 px-1">
             <Link
               href="/demo/licitaciones"
-              className="w-full sm:w-auto justify-center px-7 py-3.5 rounded-2xl bg-black text-white font-display font-bold text-[0.95rem] flex items-center gap-2"
+              className="w-full sm:w-auto justify-center px-7 py-3.5 rounded-2xl bg-[#3dff8f] text-[#03150a] font-display font-bold text-[0.95rem] flex items-center gap-2 shadow-[0_10px_30px_-10px_rgba(61,255,143,0.55)] transition hover:bg-[#66ffa8]"
             >
               <Layers className="w-4 h-4 shrink-0" />
               {messages.home.ctaMarket}

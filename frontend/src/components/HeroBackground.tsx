@@ -10,22 +10,22 @@ export default function HeroBackground() {
       <svg viewBox="0 0 640 320" preserveAspectRatio="xMidYMid meet" className="absolute inset-0 h-full w-full" fill="none">
         <defs>
           <linearGradient id="heroInfL" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#1a6fb8" />
-            <stop offset="100%" stopColor="#2fa8a0" />
+            <stop offset="0%" stopColor="#38bdf8" />
+            <stop offset="100%" stopColor="#20e0b8" />
           </linearGradient>
           <linearGradient id="heroInfR" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#2fa8a0" />
-            <stop offset="100%" stopColor="#4ea743" />
+            <stop offset="0%" stopColor="#20e0b8" />
+            <stop offset="100%" stopColor="#3dff8f" />
           </linearGradient>
           <linearGradient id="heroInf" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#1a6fb8" />
-            <stop offset="50%" stopColor="#2fa8a0" />
-            <stop offset="100%" stopColor="#4ea743" />
+            <stop offset="0%" stopColor="#38bdf8" />
+            <stop offset="50%" stopColor="#20e0b8" />
+            <stop offset="100%" stopColor="#3dff8f" />
           </linearGradient>
           <linearGradient id="heroBand" x1="0" y1="1" x2="1" y2="0">
-            <stop offset="0%" stopColor="#1a6fb8" />
-            <stop offset="55%" stopColor="#2fa8a0" />
-            <stop offset="100%" stopColor="#4ea743" />
+            <stop offset="0%" stopColor="#38bdf8" />
+            <stop offset="55%" stopColor="#20e0b8" />
+            <stop offset="100%" stopColor="#3dff8f" />
           </linearGradient>
           <filter id="heroGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="12" />
@@ -38,29 +38,29 @@ export default function HeroBackground() {
         </g>
         {/* infinito: cinta lemniscata con gradiente azul→teal→verde */}
         <g className="globe-float">
-          <path d={INFINITY_PATH} stroke="#2fa8a0" strokeWidth="46" strokeLinecap="round" opacity="0.045" filter="url(#heroGlow)" />
+          <path d={INFINITY_PATH} stroke="#20e0b8" strokeWidth="46" strokeLinecap="round" opacity="0.045" filter="url(#heroGlow)" />
           <path d={INFINITY_PATH} stroke="url(#heroInf)" strokeWidth="30" strokeLinecap="round" opacity="0.1" />
           <path d={INFINITY_PATH} stroke="url(#heroInf)" strokeWidth="30" strokeLinecap="round" strokeDasharray="46 18" opacity="0.15" className="infinity-drift" />
           <path d={INFINITY_PATH} stroke="#f0b429" strokeWidth="4" strokeLinecap="round" strokeDasharray="110 18 110 18" opacity="0.26" className="infinity-drift-rev" />
           <path d={INFINITY_PATH} stroke="#ffffff" strokeWidth="7" strokeLinecap="round" strokeDasharray="60 196" opacity="0.18" className="infinity-drift" />
         </g>
         {/* nodos en las puntas de los lóbulos, como el logo */}
-        <circle cx="60" cy="160" r="7" fill="#1a6fb8" opacity="0.4" />
-        <circle cx="42" cy="138" r="3.5" fill="#1a6fb8" opacity="0.3" />
-        <circle cx="46" cy="184" r="3" fill="#1a6fb8" opacity="0.28" />
-        <circle cx="580" cy="160" r="7" fill="#4ea743" opacity="0.4" />
-        <circle cx="600" cy="140" r="3.5" fill="#4ea743" opacity="0.3" />
-        <circle cx="604" cy="182" r="3" fill="#4ea743" opacity="0.28" />
-        <circle cx="320" cy="160" r="5" fill="#2fa8a0" opacity="0.4" />
+        <circle cx="60" cy="160" r="7" fill="#38bdf8" opacity="0.4" />
+        <circle cx="42" cy="138" r="3.5" fill="#38bdf8" opacity="0.3" />
+        <circle cx="46" cy="184" r="3" fill="#38bdf8" opacity="0.28" />
+        <circle cx="580" cy="160" r="7" fill="#3dff8f" opacity="0.4" />
+        <circle cx="600" cy="140" r="3.5" fill="#3dff8f" opacity="0.3" />
+        <circle cx="604" cy="182" r="3" fill="#3dff8f" opacity="0.28" />
+        <circle cx="320" cy="160" r="5" fill="#20e0b8" opacity="0.4" />
         <circle cx="452" cy="120" r="6" fill="#f0b429" opacity="0.4" />
         {/* partículas viajando por el infinito y la órbita */}
         {[-6, -3, 0].map((begin) => (
-          <circle key={`g${begin}`} r="4" fill="#4ea743" opacity="0.4">
+          <circle key={`g${begin}`} r="4" fill="#3dff8f" opacity="0.4">
             <animateMotion dur="9s" begin={`${begin}s`} repeatCount="indefinite" path={INFINITY_PATH} />
           </circle>
         ))}
         {[-4, -9].map((begin) => (
-          <circle key={`t${begin}`} r="3" fill="#2fa8a0" opacity="0.36">
+          <circle key={`t${begin}`} r="3" fill="#20e0b8" opacity="0.36">
             <animateMotion dur="12s" begin={`${begin}s`} repeatCount="indefinite" path={INFINITY_PATH} />
           </circle>
         ))}
@@ -70,28 +70,28 @@ export default function HeroBackground() {
         <circle r="3.5" fill="#1d7fc4" opacity="0.36">
           <animateMotion dur="13s" begin="-4s" repeatCount="indefinite" path={HERO_ORBIT} />
         </circle>
-        <circle r="3" fill="#4ea743" opacity="0.36">
+        <circle r="3" fill="#3dff8f" opacity="0.36">
           <animateMotion dur="16s" begin="-10s" repeatCount="indefinite" path={HERO_ORBIT} />
         </circle>
         {/* ambient */}
         <circle cx="92" cy="248" r="36" fill="#1d7fc4" opacity="0.06" filter="url(#heroGlow)" />
-        <circle cx="556" cy="76" r="44" fill="#4ea743" opacity="0.06" filter="url(#heroGlow)" />
+        <circle cx="556" cy="76" r="44" fill="#3dff8f" opacity="0.06" filter="url(#heroGlow)" />
         <g className="globe-float">
-          <circle cx="90" cy="48" r="2.4" fill="#4ea743" opacity="0.3" />
-          <circle cx="556" cy="52" r="3" fill="#4ea743" opacity="0.26" />
-          <circle cx="48" cy="264" r="2.8" fill="#4ea743" opacity="0.24" />
-          <circle cx="592" cy="272" r="2.2" fill="#4ea743" opacity="0.3" />
-          <circle cx="320" cy="26" r="2" fill="#4ea743" opacity="0.26" />
+          <circle cx="90" cy="48" r="2.4" fill="#3dff8f" opacity="0.3" />
+          <circle cx="556" cy="52" r="3" fill="#3dff8f" opacity="0.26" />
+          <circle cx="48" cy="264" r="2.8" fill="#3dff8f" opacity="0.24" />
+          <circle cx="592" cy="272" r="2.2" fill="#3dff8f" opacity="0.3" />
+          <circle cx="320" cy="26" r="2" fill="#3dff8f" opacity="0.26" />
         </g>
-        <circle cx="140" cy="70" r="14" stroke="#4ea743" strokeWidth="1" opacity="0.12" />
-        <circle cx="505" cy="255" r="18" stroke="#4ea743" strokeWidth="1" opacity="0.1" />
-        <circle cx="70" cy="200" r="9" stroke="#4ea743" strokeWidth="1" opacity="0.12" />
-        <circle cx="600" cy="110" r="22" stroke="#4ea743" strokeWidth="1" opacity="0.09" strokeDasharray="3 5" />
-        <path d="M40 96v10M35 101h10" stroke="#4ea743" strokeWidth="1.4" opacity="0.22" strokeLinecap="round" />
-        <path d="M604 210v10M599 215h10" stroke="#4ea743" strokeWidth="1.4" opacity="0.2" strokeLinecap="round" />
-        <path d="M210 286v8M206 290h8" stroke="#4ea743" strokeWidth="1.4" opacity="0.18" strokeLinecap="round" />
-        <rect x="530" y="30" width="7" height="7" rx="1.5" stroke="#4ea743" strokeWidth="1" opacity="0.18" transform="rotate(18 533.5 33.5)" />
-        <rect x="118" y="250" width="6" height="6" rx="1.2" stroke="#4ea743" strokeWidth="1" opacity="0.16" transform="rotate(24 121 253)" />
+        <circle cx="140" cy="70" r="14" stroke="#3dff8f" strokeWidth="1" opacity="0.12" />
+        <circle cx="505" cy="255" r="18" stroke="#3dff8f" strokeWidth="1" opacity="0.1" />
+        <circle cx="70" cy="200" r="9" stroke="#3dff8f" strokeWidth="1" opacity="0.12" />
+        <circle cx="600" cy="110" r="22" stroke="#3dff8f" strokeWidth="1" opacity="0.09" strokeDasharray="3 5" />
+        <path d="M40 96v10M35 101h10" stroke="#3dff8f" strokeWidth="1.4" opacity="0.22" strokeLinecap="round" />
+        <path d="M604 210v10M599 215h10" stroke="#3dff8f" strokeWidth="1.4" opacity="0.2" strokeLinecap="round" />
+        <path d="M210 286v8M206 290h8" stroke="#3dff8f" strokeWidth="1.4" opacity="0.18" strokeLinecap="round" />
+        <rect x="530" y="30" width="7" height="7" rx="1.5" stroke="#3dff8f" strokeWidth="1" opacity="0.18" transform="rotate(18 533.5 33.5)" />
+        <rect x="118" y="250" width="6" height="6" rx="1.2" stroke="#3dff8f" strokeWidth="1" opacity="0.16" transform="rotate(24 121 253)" />
       </svg>
     </div>
   );

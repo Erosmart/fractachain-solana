@@ -79,7 +79,7 @@ export default function Navbar() {
   ) : (
     <Link
       href={`/login?next=${encodeURIComponent(pathname)}`}
-      className="flex items-center gap-1.5 rounded-full bg-black text-white px-3.5 py-2 text-xs font-bold hover:bg-black/85"
+      className="flex items-center gap-1.5 rounded-full bg-[#3dff8f] text-[#03150a] px-3.5 py-2 text-xs font-bold shadow-[0_8px_20px_-8px_rgba(61,255,143,0.5)] transition hover:bg-[#66ffa8]"
     >
       <LogIn className="w-3.5 h-3.5" />
       {t('acct.login')}
