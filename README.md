@@ -4,7 +4,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js_14-000000?style=flat&logo=nextdotjs&logoColor=white)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-The first regulated Real-World-Asset (RWA) marketplace in Argentina, on **Solana**: primary offerings (licitaciones) of equity and debt for companies and producers, with on-chain secondary trading.
+We want to be Argentina's first regulated Real-World-Asset (RWA) marketplace, on **Solana**: primary offerings (licitaciones) of equity and debt for companies and producers, with on-chain secondary trading.
 
 - Regulated tokens on **Token-2022** (native compliance: accounts frozen until KYC)
 - On-chain order book with **Manifest** (CLOB, no AMM)
