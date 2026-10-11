@@ -17,6 +17,11 @@ We want to be Argentina's first regulated Real-World-Asset (RWA) marketplace, on
 
 Argentine producers and SMEs need dollars against the season (seed, fertilizer, freight) and investors want yield with real backing. The traditional circuit — bank / warrant / Caja de Valores — is slow, expensive, and has almost no secondary market where an investor can resell what they subscribed.
 
+The market fails on both sides:
+
+- **The money is there, but outside the system**: Argentines hold an estimated **~US$200 billion (USD, not pesos)** in savings outside the formal financial system — mattress cash, safe-deposit boxes and offshore accounts ([La Nación](https://www.lanacion.com.ar/editoriales/existe-un-rigi-para-el-conurbano-nid16082026/) · [BCG via Forbes Argentina](https://www.forbesargentina.com/money/bancos-argentina-mercado-mayor-potencial-bcg-n95342)).
+- **The companies are there, but cut off**: SMEs are 98% of the country's business fabric, yet only **~4% of SME financing** comes through capital markets ([Ministerio de Producción — PAcP](https://www.argentina.gob.ar/sites/default/files/3.1_pacp-politica_de_acceso_al_credito_productivo_vf_0.pdf)).
+
 Issuing an Obligación Negociable (ON) today means guarantee fees + placement commissions + legal and accounting fees + market charges on top of the interest rate, with a practical floor around USD 1.4M (low-impact regime) or ~USD 27M (fully-guaranteed PyME regime). Going public on BYMA is even further out of reach.
 
 ## The solution
