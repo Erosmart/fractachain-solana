@@ -190,11 +190,6 @@ export default function MercadoPage() {
       ) : pools.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-black/15 p-8 text-center text-sm text-black/60">
           {error || t('acct.marketEmpty')}
-          <div className="mt-3">
-            <Link href="/demo" className="font-bold underline underline-offset-2">
-              {t('acct.navDemo')}
-            </Link>
-          </div>
         </div>
       ) : (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

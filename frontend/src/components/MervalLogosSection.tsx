@@ -54,7 +54,7 @@ export default function MervalLogosSection() {
         </div>
       </div>
       <div className="flex flex-wrap gap-3">
-        <Link href="/demo/licitaciones" className="px-6 py-3.5 rounded-2xl bg-white/80 border border-black/10 text-black font-section font-bold text-sm">
+        <Link href="/mercado" className="px-6 py-3.5 rounded-2xl bg-white/80 border border-black/10 text-black font-section font-bold text-sm">
           {merval.ctaBonds}
         </Link>
       </div>

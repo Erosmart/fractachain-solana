@@ -20,6 +20,7 @@ import DynamicHeroText from '../components/DynamicHeroText';
 import HeroBackground from '../components/HeroBackground';
 import ProductsSection from '../components/ProductsSection';
 import RegulationSection from '../components/RegulationSection';
+import VersusSection from '../components/VersusSection';
 import MervalLogosSection from '../components/MervalLogosSection';
 import LiquidityFirstBanner from '../components/LiquidityFirstBanner';
 import PartnersShowcase from '../components/PartnersShowcase';
@@ -62,14 +63,14 @@ export default function HomePage() {
           </p>
           <div className="flex w-full flex-col sm:flex-row sm:flex-wrap lg:flex-nowrap items-stretch sm:items-center justify-center gap-2.5 pt-1 px-1">
             <Link
-              href="/demo/licitaciones"
+              href="/mercado"
               className="w-full sm:w-auto justify-center px-7 py-3.5 rounded-2xl bg-black text-white font-display font-bold text-[0.95rem] flex items-center gap-2"
             >
               <Layers className="w-4 h-4 shrink-0" />
               {messages.home.ctaMarket}
             </Link>
             <Link
-              href="/demo/orderbook"
+              href="/orderbook"
               className="w-full sm:w-auto justify-center px-7 py-3.5 rounded-2xl bg-white/60 border border-black/10 text-black font-display font-semibold text-[0.95rem] flex items-center gap-2"
             >
               <Droplets className="w-4 h-4 shrink-0" />
@@ -85,6 +86,7 @@ export default function HomePage() {
       <ProductsSection />
       <IssuerCtaBanner />
       <RegulationSection />
+      <VersusSection />
       <LiquidityFirstBanner />
 
       <PartnersShowcase />
