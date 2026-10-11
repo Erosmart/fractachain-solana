@@ -133,7 +133,7 @@ const es = {
   regulation: {
     kicker: 'Marco legal',
     title: 'Marco CNV. Inversión global. Diseñado para el sandbox.',
-    body: 'El diseño sigue el sandbox de la CNV (RG 1150 / Ley 26.831): cada token está pensado 1:1 con un activo real en Caja de Valores, con warrants bajo la Ley 9643 y forwards del Código Civil. No es una habilitación ya obtenida. Un inversor en Madrid, Miami o São Paulo usaría el mismo marco que un comitente en Buenos Aires.',
+    body: 'El diseño sigue el sandbox de la CNV (RG 1150 / Ley 26.831): cada token está pensado 1:1 con un activo real en Caja de Valores, con warrants bajo la Ley 9643 y forwards del Código Civil. No es una habilitación ya obtenida. Un inversor extranjero seguiría el mismo recorrido que un comitente local: se registra con pasaporte o documento, pasa la verificación KYC/AML ante la UIF, fondea su cuenta en USDC y suscribe la licitación on-chain desde cualquier jurisdicción habilitada. La plataforma no haría oferta hacia EE.UU.: el onboarding filtraría por jurisdicción.',
     cnv: 'Comisión Nacional de Valores',
     cnvSub: 'Sandbox RG 1150 / 2026 · Ley 26.831',
     caja: 'Caja de Valores S.A.',
@@ -1241,7 +1241,7 @@ const en: Messages = {
   regulation: {
     kicker: 'Legal framework',
     title: 'CNV framework. Global investment. Designed for the sandbox.',
-    body: 'The design follows the CNV sandbox (RG 1150 / Law 26.831): each token is meant 1:1 with a real asset at Caja de Valores, with warrants under Law 9643 and forwards under the Civil Code. That authorization has not been granted. An investor in Madrid, Miami or São Paulo would use the same framework as an account holder in Buenos Aires.',
+    body: 'The design follows the CNV sandbox (RG 1150 / Law 26.831): each token is meant 1:1 with a real asset at Caja de Valores, with warrants under Law 9643 and forwards under the Civil Code. That authorization has not been granted. A foreign investor would go through the same journey as a local one: sign up with a passport or ID, pass the KYC/AML check with the UIF, fund the account in USDC and subscribe to the offering on-chain from any supported jurisdiction. The platform would not offer into the U.S. — onboarding would screen by jurisdiction.',
     cnv: 'National Securities Commission',
     cnvSub: 'Sandbox RG 1150 / 2026 · Law 26.831',
     caja: 'Caja de Valores S.A.',
