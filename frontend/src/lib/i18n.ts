@@ -141,8 +141,8 @@ const es = {
     stepsTitle: 'De la idea a la licitación: 4 pasos',
     steps: [
       ['Constitución de la sociedad', 'Una SAS o S.A. ante la IGJ / Registro Público provincial opera la plataforma y es titular de todas las inscripciones regulatorias.'],
-      ['Inscripción PSAV ante la CNV', 'El registro de Proveedores de Servicios de Activos Virtuales (Ley 27.739, RG 1058) habilita a custodiar, emitir y facilitar la compraventa de tokens. Pide programa AML/CFT ante la UIF, solvencia, idoneidad técnica y un Oficial de Cumplimiento.'],
-      ['Fideicomiso financiero', 'Con oferta pública bajo la Ley 26.831 y el Sandbox CNV (RG 1069/1081/1087/1150, vigente al 31/12/2027). Se estructura como Programa Global con Series independientes: cada emisión sucesiva sale más barata.'],
+      ['Inscripción PSAV + PCAB propios', 'Nos constituimos nosotros mismos como Proveedor de Servicios de Activos Virtuales (Ley 27.739, RG 1058) y como nuestra propia entidad de custodia (PCAB). Son figuras intransferibles: nadie puede "prestarnos" su registro — eso sería un prestanombre, que es ilegal. Incluye programa AML/CFT ante la UIF, solvencia, idoneidad técnica y un Oficial de Cumplimiento.'],
+      ['Fideicomiso financiero propio', 'Constituimos nosotros el fideicomiso con oferta pública bajo la Ley 26.831 y el Sandbox CNV (RG 1069/1081/1087/1150, vigente al 31/12/2027). Se estructura como Programa Global con Series independientes: cada emisión sucesiva sale más barata.'],
       ['Tokenización y emisión', 'Las cuotapartes del fideicomiso —o las acciones y bonos que una empresa emite dentro de una Serie— se representan como tokens en Solana, respaldados 1:1 por el activo custodiado.'],
     ],
     cards: [
@@ -150,6 +150,25 @@ const es = {
       ['Cualquier inversor del mundo', 'Liquidación T+0 en Solana. El riel es global; el título sigue siendo argentino y custodiado.'],
       ['Un fideicomiso, muchas emisiones', 'El Programa Global emite Series independientes; con emisión frecuente la CNV habilita autorización automática (RG 1074/2025).'],
     ],
+  },
+  versus: {
+    kicker: 'Comparativa',
+    title: 'Por qué Fractachain',
+    lead: 'Las alternativas existen — pero cada una deja afuera a alguien.',
+    cols: ['Fractachain', 'Ripio', 'Agrotoken', 'Crowdfunding CNV (Alix)'],
+    rows: [
+      ['PyMEs y mid-caps tokenizadas', '✓', '—', '—', '—'],
+      ['Activos agropecuarios y RWA', '✓', '—', 'Solo granos', '—'],
+      ['Inversores minoristas (solo KYC)', '✓', 'Parcial', 'Cerrado: productores y proveedores', '—'],
+      ['Liquidación on-chain', '✓', 'Parcial', 'Parcial', '—'],
+      ['Secundario con liquidez 24/7', '✓', '—', '—', '—'],
+      ['Inversores globales', '✓', '—', 'Solo Argentina', '—'],
+      ['Custodia a elección (self o custodial)', '✓', '—', '—', '—'],
+    ],
+    note: 'Ripio tokeniza bonos soberanos y deuda grande — las PyMEs y mid-caps quedan afuera. Agrotoken es un circuito cerrado de granos para productores y proveedores, solo en Argentina. Alix y el crowdfunding CNV apuntan a empresas grandes/IPO, off-chain y sin minoristas. Fractachain junta todo: cualquier RWA, cualquier inversor verificado, on-chain y con mercado secundario.',
+    ndaLabel: 'Pipeline bajo NDA',
+    ndaText:
+      'Estamos manteniendo conversaciones activas con empresas y productores, pero están bajo acuerdos de confidencialidad (NDA): no podemos dar nombres, detalles ni mostrar cartas de intención. Hay mucho hermetismo en el tema y hasta que no haya anuncios formales no podemos revelar más — pero las conversaciones existen y avanzan.',
   },
   merval: {
     kicker: 'Renta variable y deuda',
@@ -809,7 +828,7 @@ const es = {
     },
     'caja-de-valores': {
       role: 'Depositario Central de Valores',
-      description: 'Custodia institucional segregada 1:1 en subcuenta comitente oficial (Subcuenta N° 84920).',
+      description: 'Depósito colectivo del mercado argentino: las acciones subyacentes de los tokens Merval se referencian 1:1 en subcuenta comitente.',
       badge: 'Custodia Colectiva',
     },
     solana: {
@@ -1249,8 +1268,8 @@ const en: Messages = {
     stepsTitle: 'From idea to offering: 4 steps',
     steps: [
       ['Incorporate the company', 'A SAS or S.A. registered with the IGJ / provincial Public Registry operates the platform and holds every regulatory registration.'],
-      ['PSAV registration at the CNV', 'The Virtual Asset Service Provider registry (Law 27.739, RG 1058) authorizes custody, issuance and trading of tokens. It requires an AML/CFT program with the UIF, solvency, technical fitness and a Compliance Officer.'],
-      ['Financial trust', 'A public-offering fideicomiso under Law 26.831 and the CNV Sandbox (RG 1069/1081/1087/1150, in force until Dec 31, 2027), structured as a Global Program with independent Series so each new issuance gets cheaper.'],
+      ['Own PSAV + PCAB registration', 'We register ourselves as the Virtual Asset Service Provider (Law 27.739, RG 1058) and as our own custodian entity (PCAB). These registrations cannot be borrowed — a figurehead arrangement (prestanombre) would be illegal. Includes an AML/CFT program with the UIF, solvency, technical fitness and a Compliance Officer.'],
+      ['Our own financial trust', 'We constitute the fideicomiso ourselves: a public offering under Law 26.831 and the CNV Sandbox (RG 1069/1081/1087/1150, in force until Dec 31, 2027), structured as a Global Program with independent Series so each new issuance gets cheaper.'],
       ['Tokenization and issuance', 'The trust units —or the shares and bonds a client company issues inside a Series— become tokens on Solana, backed 1:1 by the custodied asset.'],
     ],
     cards: [
@@ -1258,6 +1277,25 @@ const en: Messages = {
       ['Any investor in the world', 'T+0 settlement on Solana. The rail is global; the security stays Argentine and custodied.'],
       ['One trust, many issuances', 'The Global Program issues independent Series; frequent issuance unlocks automatic CNV authorization (RG 1074/2025).'],
     ],
+  },
+  versus: {
+    kicker: 'Comparison',
+    title: 'Why Fractachain',
+    lead: 'Alternatives exist — but each one leaves someone out.',
+    cols: ['Fractachain', 'Ripio', 'Agrotoken', 'CNV crowdfunding (Alix)'],
+    rows: [
+      ['Tokenized SMEs and mid-caps', '✓', '—', '—', '—'],
+      ['Agro and RWA assets', '✓', '—', 'Grains only', '—'],
+      ['Retail investors (KYC only)', '✓', 'Partial', 'Closed: producers and suppliers', '—'],
+      ['On-chain settlement', '✓', 'Partial', 'Partial', '—'],
+      ['Secondary market with 24/7 liquidity', '✓', '—', '—', '—'],
+      ['Global investors', '✓', '—', 'Argentina only', '—'],
+      ['Your choice of custody (self or custodial)', '✓', '—', '—', '—'],
+    ],
+    note: 'Ripio tokenizes sovereign bonds and large-cap debt — SMEs and mid-caps are left out. Agrotoken is a closed grains circuit for producers and suppliers, Argentina only. Alix and CNV crowdfunding target large companies/IPOs, off-chain, no retail access. Fractachain brings it all together: any RWA, any verified investor, on-chain, with a secondary market.',
+    ndaLabel: 'Pipeline under NDA',
+    ndaText:
+      'We are in active conversations with companies and producers, but they are under non-disclosure agreements (NDA): we cannot share names, details or letters of intent. Confidentiality is strict — until formal announcements are made we cannot reveal more, but the conversations exist and are moving forward.',
   },
   merval: {
     kicker: 'Equities and debt',
@@ -1916,7 +1954,7 @@ const en: Messages = {
     },
     'caja-de-valores': {
       role: 'Central Securities Depository',
-      description: 'Segregated 1:1 institutional custody in an official comitente subaccount (Subaccount No. 84920).',
+      description: 'The Argentine market\u2019s collective depository: shares underlying the Merval tokens are referenced 1:1 in a comitente subaccount.',
       badge: 'Collective Custody',
     },
     solana: {

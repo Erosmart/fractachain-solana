@@ -55,6 +55,34 @@ Program instructions (all in `programs/fractachain/src/instructions/`):
 
 ---
 
+## How we compare
+
+| | Fractachain | Ripio | Agrotoken | CNV crowdfunding (Alix) |
+|---|---|---|---|---|
+| Tokenized SMEs & mid-caps | ✅ | — | — | — |
+| Agro & RWA assets | ✅ | — | Grains only | — |
+| Retail investors (KYC only) | ✅ | Partial | Closed: producers/suppliers | — |
+| On-chain settlement | ✅ | Partial | Partial | — |
+| Secondary market, 24/7 | ✅ | — | — | — |
+| Global investors | ✅ | — | Argentina only | — |
+| Self or managed custody | ✅ | — | — | — |
+
+Ripio tokenizes sovereign bonds and large-cap debt — SMEs and mid-caps are out. Agrotoken is a closed grains circuit for producers and suppliers, Argentina only. Alix and CNV crowdfunding target large companies/IPOs, off-chain, no retail access.
+
+## The regulated path — our own registrations
+
+We do not borrow anyone's license — a figurehead (prestanombre) arrangement would be illegal. The roadmap is to register **ourselves**:
+
+1. **PSAV** (Virtual Asset Service Provider) at the CNV — Law 27.739, RG 1058.
+2. **PCAB** — our own custody entity; custody can't be outsourced to a borrowed registration.
+3. **Our own fideicomiso** (financial trust) under Law 26.831 + CNV sandbox, as a Global Program with independent Series.
+
+## Commercial pipeline — under NDA
+
+We are in active conversations with companies and producers, but they are all under **non-disclosure agreements**: we cannot share names, details, or letters of intent. Confidentiality is strict on their side — until formal announcements are made we cannot reveal more. The conversations exist and are moving forward.
+
+---
+
 ## What's live vs mock
 
 | Area | Status | Detail |
