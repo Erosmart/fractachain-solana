@@ -170,6 +170,33 @@ const es = {
     ndaText:
       'Estamos manteniendo conversaciones activas con empresas y productores, pero están bajo acuerdos de confidencialidad (NDA): no podemos dar nombres, detalles ni mostrar cartas de intención. Hay mucho hermetismo en el tema y hasta que no haya anuncios formales no podemos revelar más — pero las conversaciones existen y avanzan.',
   },
+  marketStats: {
+    kicker: 'El problema, en números',
+    title: 'El mercado de capitales argentino está cerrado para casi todos',
+    items: [
+      {
+        n: '78',
+        label: 'empresas cotizan en BYMA — de ~548.000 registradas en el país. Solo el 0,014% accede al mercado.',
+        source: 'Fuente: Pulso by Gallo / BYMA (oct. 2026) · Min. de Economía vía Ámbito Financiero',
+      },
+      {
+        n: '97,8%',
+        label: 'de las empresas argentinas son PyMEs — el motor del empleo queda afuera del financiamiento bursátil.',
+        source: 'Fuente: Observatorio PyME, Ministerio de Economía',
+      },
+      {
+        n: '~4%',
+        label: 'del financiamiento PyME llega por el mercado de capitales; el resto depende del crédito bancario.',
+        source: 'Fuente: CNV / CONICET',
+      },
+      {
+        n: 'US$200B',
+        label: 'en ahorros de argentinos fuera del sistema financiero — capital que no llega a las empresas.',
+        source: 'Fuente: La Nación · estimación BCG vía Forbes Argentina',
+      },
+    ],
+    note: 'Emitir una ON tradicional suma comisión de garantía (SGR), comisión de colocación (ALyC), honorarios legales y contables y gastos de mercado — una estructura de costos que, según estudios como PAGBAM y el relevamiento de Neuquén21, deja fuera a la mayoría de las PyMEs. Nuestro trabajo es bajar esa barrera.',
+  },
   merval: {
     kicker: 'Renta variable y deuda',
     title: 'Acciones tokenizadas y bonos',
@@ -1296,6 +1323,33 @@ const en: Messages = {
     ndaLabel: 'Pipeline under NDA',
     ndaText:
       'We are in active conversations with companies and producers, but they are under non-disclosure agreements (NDA): we cannot share names, details or letters of intent. Confidentiality is strict — until formal announcements are made we cannot reveal more, but the conversations exist and are moving forward.',
+  },
+  marketStats: {
+    kicker: 'The problem, in numbers',
+    title: "Argentina's capital market is closed to almost everyone",
+    items: [
+      {
+        n: '78',
+        label: 'companies trade on BYMA — out of ~548,000 registered nationwide. Only 0.014% can reach the market.',
+        source: 'Source: Pulso by Gallo / BYMA (Oct 2026) · Min. of Economy via Ámbito Financiero',
+      },
+      {
+        n: '97.8%',
+        label: 'of Argentine companies are SMEs — the engine of employment sits outside capital-market funding.',
+        source: 'Source: SME Observatory, Ministry of Economy',
+      },
+      {
+        n: '~4%',
+        label: 'of SME financing comes through capital markets; the rest depends on bank credit.',
+        source: 'Source: CNV / CONICET',
+      },
+      {
+        n: 'US$200B',
+        label: 'in Argentine savings sits outside the financial system — capital that never reaches companies.',
+        source: 'Source: La Nación · BCG estimate via Forbes Argentina',
+      },
+    ],
+    note: 'Issuing a traditional corporate bond adds a guarantee fee (SGR), a placement fee (ALyC), legal and accounting fees and market costs — a cost structure that, per studies like PAGBAM and the Neuquén21 review, prices most SMEs out. Our job is to lower that barrier.',
   },
   merval: {
     kicker: 'Equities and debt',

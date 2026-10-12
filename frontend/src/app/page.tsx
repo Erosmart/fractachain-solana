@@ -21,6 +21,7 @@ import HeroBackground from '../components/HeroBackground';
 import ProductsSection from '../components/ProductsSection';
 import RegulationSection from '../components/RegulationSection';
 import VersusSection from '../components/VersusSection';
+import MarketStatsSection from '../components/MarketStatsSection';
 import MervalLogosSection from '../components/MervalLogosSection';
 import LiquidityFirstBanner from '../components/LiquidityFirstBanner';
 import PartnersShowcase from '../components/PartnersShowcase';
@@ -79,6 +80,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <MarketStatsSection />
 
       <MoreThanRwaSection />
 
