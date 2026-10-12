@@ -84,7 +84,7 @@ export default function ValuationPage() {
                     <tr
                       key={i}
                       className={`border-t border-black/10 ${
-                        sec.id === 'modelo' && i === sec.table!.rows.length - 1 ? 'bg-leaf-100/70' : ''
+                        (sec.id === 'modelo' || sec.id === 'costos') && i === sec.table!.rows.length - 1 ? 'bg-leaf-100/70' : ''
                       }`}
                     >
                       {row.map((cell, j) => (

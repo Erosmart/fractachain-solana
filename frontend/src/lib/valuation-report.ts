@@ -112,10 +112,51 @@ export const reportSections: ReportSection[] = [
     },
   },
   {
+    id: 'costos',
+    title: {
+      es: '5. Cuánto cuesta salir al mercado: el costo de emisión',
+      en: '5. What it costs to access the market: issuance costs',
+    },
+    paras: {
+      es: [
+        'Ninguna fuente publica un "precio único" para salir al mercado porque el costo depende del monto emitido y del régimen elegido. Pero los componentes sí están documentados: garantía de una Sociedad de Garantía Recíproca, comisión de colocación de la ALyC, calificación de riesgo, honorarios legales y contables, y gastos de mercado. Reconstruimos el total juntando las piezas citadas en las fuentes.',
+        'Los regímenes vigentes (PAGBAM; Resolución General CNV 1095/2025): el régimen de Oferta Pública con Autorización Automática por Bajo Impacto tiene un tope de UVA 1.000.000 sin garantía (~US$1,36 millones), y la ON PyME CNV Garantizada llega a UVA 20.000.000 (~US$27 millones) cuando la emisión está totalmente garantizada. Las PyMEs están exentas del arancel CNV y de la tasa de fiscalización.',
+        'El hallazgo académico central (Gamero; simulación de costos de emisión de ON PyME): cuanto menor es el monto de la emisión, mayor es el costo relativo — los honorarios profesionales son en gran parte fijos y dominan el costo total. La barrera de entrada al mercado no es la tasa de interés sino el costo fijo de estructurar.',
+        'Salir a bolsa de acciones (IPO) es un salto de categoría: exige reportes trimestrales a la CNV, escrutinio permanente de accionistas y una estructura de compliance que tensiona al management (Forbes Argentina). Una OPI completa "puede durar meses o años y costar millones de dólares" (La Nación). Por eso incluso empresas que podrían cotizar —el caso Arcor— prefieren emitir deuda.',
+        'La implicación para este ecosistema: una ON PyME garantizada de ~US$2 millones cuesta entre US$195.000 y US$230.000 all-in — cerca del 10% del monto captado antes de pagar un solo interés. Y en emisiones chicas sin garantía, los US$35.000–62.000 de costo fijo representan 7–12% de lo levantado. Esa fricción es la que la emisión tokenizada con liquidación on-chain busca reducir.',
+      ],
+      en: [
+        'No source publishes a single "price" for accessing the market because the cost depends on the amount issued and the chosen regime. But the components are documented: Reciprocal Guarantee Society (SGR) guarantee, ALyC placement commission, credit rating, legal and accounting fees, and market expenses. We reconstruct the total by assembling the pieces cited in the sources.',
+        'Current regimes (PAGBAM; CNV General Resolution 1095/2025): the Public Offering with Automatic Authorization for Low Impact regime caps at UVA 1,000,000 unguaranteed (~US$1.36M), and the CNV Guaranteed SME Note reaches UVA 20,000,000 (~US$27M) when fully guaranteed. SMEs are exempt from the CNV fee and the oversight levy.',
+        'The central academic finding (Gamero; SME-note issuance cost simulation): the smaller the issuance, the higher the relative cost — professional fees are largely fixed and dominate the total. The barrier to market access is not the interest rate but the fixed structuring cost.',
+        'Listing shares (IPO) is a different league: it demands quarterly CNV reporting, permanent shareholder scrutiny and a compliance structure that strains management (Forbes Argentina). A full IPO "can take months or years and cost millions of dollars" (La Nación). That is why even companies that could list —the Arcor case— prefer issuing debt.',
+        'The implication for this ecosystem: a ~US$2M guaranteed SME note costs US$195,000–230,000 all-in — about 10% of the amount raised before paying a single interest payment. And on small unguaranteed issuances, the US$35,000–62,000 fixed cost represents 7–12% of what was raised. That friction is what tokenized issuance with on-chain settlement aims to reduce.',
+      ],
+    },
+    table: {
+      head: {
+        es: ['Componente del costo', 'ON PyME Garantizada · ~US$2M a 24 meses', 'ON Bajo Impacto · ~US$500K a 12 meses'],
+        en: ['Cost component', 'Guaranteed SME Note · ~US$2M over 24 months', 'Low Impact Note · ~US$500K over 12 months'],
+      },
+      rows: [
+        ['Garantía SGR (2–4% anual / per year)', '~US$120K', 'Sin garantía / None'],
+        ['Colocación ALyC (~1,5%) / Placement (~1.5%)', '~US$30K', '~US$7,5K'],
+        ['Calificación de riesgo / Credit rating', '~US$10K', 'Opcional / Optional'],
+        ['Honorarios legales, contables y prospecto / Legal, accounting, prospectus', '~US$30–60K', '~US$25–50K'],
+        ['Aranceles CNV + Mercados + depósito / CNV + exchange + depositary fees', '~US$5–10K (PyME exenta de CNV / SME exempt from CNV fee)', '~US$2–5K'],
+        ['TOTAL all-in (antes de la tasa / before interest)', '≈ US$195–230K (~10% del monto / of proceeds)', '≈ US$35–62K (7–12% del monto / of proceeds)'],
+      ],
+    },
+    note: {
+      es: 'Los totales son estimaciones propias armadas desde componentes documentados — no existe una cifra única publicada del costo de emitir. Referencias de la IPO: reportes trimestrales a la CNV, exposición pública y costos de estructura (Forbes Argentina, sep/2026); duración y orden de magnitud de una OPI (La Nación, may/2026).',
+      en: 'Totals are our own estimates assembled from documented components — there is no single published figure for the cost of issuing. IPO references: quarterly CNV reporting, public exposure and structural costs (Forbes Argentina, Sep 2026); duration and order of magnitude of an IPO (La Nación, May 2026).',
+    },
+  },
+  {
     id: 'vc',
     title: {
-      es: '5. La excepción a la regla: el dinamismo del Venture Capital',
-      en: '5. The exception to the rule: Venture Capital dynamism',
+      es: '6. La excepción a la regla: el dinamismo del Venture Capital',
+      en: '6. The exception to the rule: Venture Capital dynamism',
     },
     paras: {
       es: [
@@ -153,8 +194,8 @@ export const reportSections: ReportSection[] = [
   {
     id: 'marco',
     title: {
-      es: '6. Marco teórico: valuación de capital privado',
-      en: '6. Theoretical framework: private-company valuation',
+      es: '7. Marco teórico: valuación de capital privado',
+      en: '7. Theoretical framework: private-company valuation',
     },
     paras: {
       es: [
@@ -193,8 +234,8 @@ export const reportSections: ReportSection[] = [
   {
     id: 'informalidad',
     title: {
-      es: '7. La sombra de la informalidad y su impacto valuatorio',
-      en: '7. The shadow of informality and its valuation impact',
+      es: '8. La sombra de la informalidad y su impacto valuatorio',
+      en: '8. The shadow of informality and its valuation impact',
     },
     paras: {
       es: [
@@ -212,8 +253,8 @@ export const reportSections: ReportSection[] = [
   {
     id: 'modelo',
     title: {
-      es: '8. Modelización cuantitativa: la cifra aproximada',
-      en: '8. Quantitative model: the approximate figure',
+      es: '9. Modelización cuantitativa: la cifra aproximada',
+      en: '9. Quantitative model: the approximate figure',
     },
     paras: {
       es: [
@@ -251,8 +292,8 @@ export const reportSections: ReportSection[] = [
   {
     id: 'catalizadores',
     title: {
-      es: '9. Perspectivas futuras y catalizadores de valor',
-      en: '9. Future outlook and value catalysts',
+      es: '10. Perspectivas futuras y catalizadores de valor',
+      en: '10. Future outlook and value catalysts',
     },
     paras: {
       es: [
