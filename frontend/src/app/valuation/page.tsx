@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import { BarChart3, TrendingDown, TrendingUp, BookOpen, ArrowLeft } from 'lucide-react';
+import { BarChart3, BookOpen, ArrowLeft } from 'lucide-react';
 import { getServerMessages, getServerLocale } from '../../lib/i18n-server';
 import { valuationSources } from '../../lib/valuation-sources';
+import { reportSections } from '../../lib/valuation-report';
 
 export default function ValuationPage() {
   const messages = getServerMessages();
@@ -9,7 +10,7 @@ export default function ValuationPage() {
   const v = messages.valuation;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 sm:space-y-10 py-4 sm:py-8">
+    <div className="mx-auto max-w-4xl space-y-10 sm:space-y-14 py-4 sm:py-8">
       <Link href="/" className="inline-flex items-center gap-1.5 text-xs font-display font-bold text-neutral-500 hover:text-black">
         <ArrowLeft className="w-3.5 h-3.5" /> {v.backHome}
       </Link>
@@ -31,62 +32,98 @@ export default function ValuationPage() {
         <p className="text-[11px] text-neutral-500 max-w-lg mx-auto leading-relaxed">{v.resultNote}</p>
       </section>
 
-      <section className="space-y-4">
-        <h2 className="font-section text-xl sm:text-2xl font-extrabold text-black">{v.contextTitle}</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {v.context.map(([n, label]) => (
-            <div key={n} className="p-5 rounded-2xl crystal-card space-y-2">
-              <div className="font-lcd text-2xl font-extrabold text-black">{n}</div>
-              <p className="text-xs sm:text-sm text-neutral-600 leading-snug">{label}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      {reportSections.map((sec) => (
+        <section key={sec.id} className="space-y-4 sm:space-y-5">
+          <h2 className="font-section text-lg sm:text-2xl font-extrabold text-black leading-snug">
+            {sec.title[locale]}
+          </h2>
 
-      <section className="space-y-4">
-        <h2 className="font-section text-xl sm:text-2xl font-extrabold text-black">{v.modelTitle}</h2>
-        <div className="overflow-x-auto rounded-2xl crystal-card">
-          <table className="w-full min-w-[560px] text-left border-collapse">
-            <tbody>
-              {v.modelSteps.map(([step, value, why], i) => (
-                <tr
-                  key={step}
-                  className={`border-t border-black/10 first:border-t-0 ${
-                    i === v.modelSteps.length - 1 ? 'bg-leaf-100/70' : ''
-                  }`}
-                >
-                  <td className="p-3 sm:p-4 text-xs sm:text-sm font-display font-bold text-black w-1/3">{step}</td>
-                  <td className="p-3 sm:p-4 font-lcd font-extrabold text-sm sm:text-base text-black whitespace-nowrap">{value}</td>
-                  <td className="p-3 sm:p-4 text-[11px] sm:text-xs text-neutral-500 leading-snug">{why}</td>
-                </tr>
+          {sec.paras[locale].map((p, i) => (
+            <p key={i} className="text-sm sm:text-[0.95rem] text-neutral-700 leading-relaxed">
+              {p}
+            </p>
+          ))}
+
+          {sec.formulas && (
+            <div className="rounded-2xl crystal-card p-5 sm:p-6 space-y-3 bg-white/70">
+              {sec.formulas.map((f) => (
+                <p key={f} className="font-mono text-sm sm:text-base text-black text-center font-bold">
+                  {f}
+                </p>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <h2 className="font-section text-xl sm:text-2xl font-extrabold text-black inline-flex items-center gap-2">
-          <TrendingDown className="w-5 h-5 text-neutral-500" /> {v.whyTitle}
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {v.whyCards.map(([title, body]) => (
-            <div key={title} className="p-5 rounded-2xl crystal-card space-y-2">
-              <div className="text-sm font-display font-bold text-black">{title}</div>
-              <p className="text-xs text-neutral-600 leading-relaxed">{body}</p>
             </div>
-          ))}
-        </div>
-      </section>
+          )}
 
-      <section className="rounded-2xl sm:rounded-3xl crystal-card p-5 sm:p-8 space-y-3">
-        <h2 className="font-section text-xl sm:text-2xl font-extrabold text-black inline-flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-[#4ea743]" /> {v.catalystTitle}
-        </h2>
-        <p className="text-sm text-neutral-600 leading-relaxed">{v.catalyst}</p>
-      </section>
+          {sec.bullets && (
+            <ul className="space-y-2.5 pl-1">
+              {sec.bullets[locale].map((b) => (
+                <li key={b.term} className="text-sm text-neutral-700 leading-relaxed flex gap-2">
+                  <span className="text-[#4ea743] font-bold shrink-0">·</span>
+                  <span>
+                    <strong className="text-black">{b.term}</strong> — {b.def}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
 
-      <section className="space-y-5">
+          {sec.table && (
+            <div className="overflow-x-auto rounded-2xl crystal-card">
+              <table className="w-full min-w-[520px] text-left border-collapse">
+                <thead>
+                  <tr>
+                    {sec.table.head[locale].map((h) => (
+                      <th key={h} className="p-3 text-[11px] font-lcd uppercase tracking-wider text-neutral-500">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sec.table.rows.map((row, i) => (
+                    <tr
+                      key={i}
+                      className={`border-t border-black/10 ${
+                        sec.id === 'modelo' && i === sec.table!.rows.length - 1 ? 'bg-leaf-100/70' : ''
+                      }`}
+                    >
+                      {row.map((cell, j) => (
+                        <td
+                          key={j}
+                          className={`p-3 text-xs sm:text-sm leading-snug ${
+                            j === 1 ? 'font-lcd font-extrabold text-black whitespace-nowrap' : 'text-neutral-600'
+                          } ${j === 0 ? 'font-display font-semibold text-black' : ''}`}
+                        >
+                          {cell}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {sec.statCards && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {sec.statCards.map((c) => (
+                <div key={c.n} className="p-5 rounded-2xl crystal-card space-y-2">
+                  <div className="font-lcd text-2xl font-extrabold text-black">{c.n}</div>
+                  <p className="text-xs sm:text-sm text-neutral-600 leading-snug">{c.label[locale]}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {sec.note && (
+            <p className="text-[11px] text-neutral-500 leading-relaxed italic border-l-2 border-leaf-100 pl-3">
+              {sec.note[locale]}
+            </p>
+          )}
+        </section>
+      ))}
+
+      <section className="space-y-5 border-t border-black/10 pt-8">
         <div className="space-y-2">
           <h2 className="font-section text-xl sm:text-2xl font-extrabold text-black inline-flex items-center gap-2">
             <BookOpen className="w-5 h-5" /> {v.sourcesTitle}
