@@ -23,9 +23,9 @@ type I18nCtx = {
 };
 
 const I18nContext = createContext<I18nCtx>({
-  locale: 'es',
+  locale: 'en',
   t: (key) => key,
-  messages: dictionaries.es,
+  messages: dictionaries.en,
   toggleLocale: () => {},
 });
 
@@ -45,7 +45,7 @@ function lookup(messages: Messages, key: string): string | undefined {
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const [locale, setLocale] = useState<Locale>('es');
+  const [locale, setLocale] = useState<Locale>('en');
   const [hydrated, setHydrated] = useState(false);
   const refreshed = useRef(false);
 

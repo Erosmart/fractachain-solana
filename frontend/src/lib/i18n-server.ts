@@ -6,7 +6,7 @@ import { dictionaries, type Locale, type Messages } from './i18n';
  * into a cookie so RSC sections can render the same dictionary.
  */
 export function getServerLocale(): Locale {
-  return cookies().get('fc_lang')?.value === 'en' ? 'en' : 'es';
+  return cookies().get('fc_lang')?.value === 'es' ? 'es' : 'en';
 }
 
 export function getServerMessages(): Messages {

@@ -37,9 +37,9 @@ const es = {
   },
   home: {
     badge: 'Colosseum · Superteam Argentina · Solana',
-    leadBefore: 'El Primer Mercado',
-    leadStrong: 'Crypto RWA',
-    leadL1End: 'de Argentina.',
+    leadBefore: 'Queremos ser el Primer Mercado',
+    leadStrong: 'Crypto RWA regulado',
+    leadL1End: 'de Argentina para activos del mundo real.',
     leadL2Pre: 'Conectamos el ',
     leadStrongCap: 'mercado de capitales',
     leadL2Post: ' con las empresas de manera 100% trazable,',
@@ -133,7 +133,7 @@ const es = {
   regulation: {
     kicker: 'Marco legal',
     title: 'Marco CNV. Inversión global. Diseñado para el sandbox.',
-    body: 'El diseño sigue el sandbox de la CNV (RG 1150 / Ley 26.831): cada token está pensado 1:1 con un activo real en Caja de Valores, con warrants bajo la Ley 9643 y forwards del Código Civil. No es una habilitación ya obtenida. Un inversor en Madrid, Miami o São Paulo usaría el mismo marco que un comitente en Buenos Aires.',
+    body: 'El diseño sigue el sandbox de la CNV (RG 1150 / Ley 26.831): cada token está pensado 1:1 con un activo real en Caja de Valores, con warrants bajo la Ley 9643 y forwards del Código Civil. No es una habilitación ya obtenida. Un inversor extranjero seguiría el mismo recorrido que un comitente local: se registra con pasaporte o documento, pasa la verificación KYC/AML ante la UIF, fondea su cuenta en USDC y suscribe la licitación on-chain desde cualquier jurisdicción habilitada. La plataforma no haría oferta hacia EE.UU.: el onboarding filtraría por jurisdicción.',
     cnv: 'Comisión Nacional de Valores',
     cnvSub: 'Sandbox RG 1150 / 2026 · Ley 26.831',
     caja: 'Caja de Valores S.A.',
@@ -141,8 +141,8 @@ const es = {
     stepsTitle: 'De la idea a la licitación: 4 pasos',
     steps: [
       ['Constitución de la sociedad', 'Una SAS o S.A. ante la IGJ / Registro Público provincial opera la plataforma y es titular de todas las inscripciones regulatorias.'],
-      ['Inscripción PSAV ante la CNV', 'El registro de Proveedores de Servicios de Activos Virtuales (Ley 27.739, RG 1058) habilita a custodiar, emitir y facilitar la compraventa de tokens. Pide programa AML/CFT ante la UIF, solvencia, idoneidad técnica y un Oficial de Cumplimiento.'],
-      ['Fideicomiso financiero', 'Con oferta pública bajo la Ley 26.831 y el Sandbox CNV (RG 1069/1081/1087/1150, vigente al 31/12/2027). Se estructura como Programa Global con Series independientes: cada emisión sucesiva sale más barata.'],
+      ['Inscripción PSAV + PCAB propios', 'Nos constituimos nosotros mismos como Proveedor de Servicios de Activos Virtuales (Ley 27.739, RG 1058) y como nuestra propia entidad de custodia (PCAB). Son figuras intransferibles: nadie puede "prestarnos" su registro — eso sería un prestanombre, que es ilegal. Incluye programa AML/CFT ante la UIF, solvencia, idoneidad técnica y un Oficial de Cumplimiento.'],
+      ['Fideicomiso financiero propio', 'Constituimos nosotros el fideicomiso con oferta pública bajo la Ley 26.831 y el Sandbox CNV (RG 1069/1081/1087/1150, vigente al 31/12/2027). Se estructura como Programa Global con Series independientes: cada emisión sucesiva sale más barata.'],
       ['Tokenización y emisión', 'Las cuotapartes del fideicomiso —o las acciones y bonos que una empresa emite dentro de una Serie— se representan como tokens en Solana, respaldados 1:1 por el activo custodiado.'],
     ],
     cards: [
@@ -150,6 +150,108 @@ const es = {
       ['Cualquier inversor del mundo', 'Liquidación T+0 en Solana. El riel es global; el título sigue siendo argentino y custodiado.'],
       ['Un fideicomiso, muchas emisiones', 'El Programa Global emite Series independientes; con emisión frecuente la CNV habilita autorización automática (RG 1074/2025).'],
     ],
+  },
+  versus: {
+    kicker: 'Comparativa',
+    title: 'Por qué Fractachain',
+    lead: 'Las alternativas existen — pero cada una deja afuera a alguien.',
+    cols: ['Fractachain', 'Ripio', 'Agrotoken', 'Crowdfunding CNV (Alix)'],
+    rows: [
+      ['PyMEs y mid-caps tokenizadas', '✓', '—', '—', '—'],
+      ['Activos agropecuarios y RWA', '✓', '—', 'Solo granos', '—'],
+      ['Inversores minoristas (solo KYC)', '✓', 'Parcial', 'Cerrado: productores y proveedores', '—'],
+      ['Liquidación on-chain', '✓', 'Parcial', 'Parcial', '—'],
+      ['Secundario con liquidez 24/7', '✓', '—', '—', '—'],
+      ['Inversores globales', '✓', '—', 'Solo Argentina', '—'],
+      ['Custodia a elección (self o custodial)', '✓', '—', '—', '—'],
+    ],
+    note: 'Ripio tokeniza bonos soberanos y deuda grande — las PyMEs y mid-caps quedan afuera. Agrotoken es un circuito cerrado de granos para productores y proveedores, solo en Argentina. Alix y el crowdfunding CNV apuntan a empresas grandes/IPO, off-chain y sin minoristas. Fractachain junta todo: cualquier RWA, cualquier inversor verificado, on-chain y con mercado secundario.',
+    ndaLabel: 'Pipeline bajo NDA',
+    ndaText:
+      'Estamos manteniendo conversaciones activas con empresas y productores, pero están bajo acuerdos de confidencialidad (NDA): no podemos dar nombres, detalles ni mostrar cartas de intención. Hay mucho hermetismo en el tema y hasta que no haya anuncios formales no podemos revelar más — pero las conversaciones existen y avanzan.',
+  },
+  marketStats: {
+    kicker: 'El problema, en números',
+    title: 'El mercado de capitales argentino está cerrado para casi todos',
+    sourcePrefix: 'Fuentes:',
+    featured: {
+      n: '~US$72B',
+      label: 'de equity privado argentino no listado — la capitalización estimada de las ~273.000 PyMEs y empresas de capital cerrado que hoy no pueden cotizar.',
+      cta: 'Ver la metodología completa →',
+    },
+    items: [
+      {
+        n: '78',
+        label: 'empresas cotizan en BYMA — de ~548.000 registradas en el país. Solo el 0,014% accede al mercado.',
+        sources: [
+          ['Pulso by Gallo · índice BYMA', 'https://data.gallofintech.com/acciones'],
+          ['Ámbito Financiero · radiografía PyME', 'https://www.ambito.com/economia/radiografia-pyme-como-se-conforma-la-estructura-productiva-argentina-n5949821'],
+        ],
+      },
+      {
+        n: '97,8%',
+        label: 'de las empresas argentinas son PyMEs — el motor del empleo queda afuera del financiamiento bursátil.',
+        sources: [
+          ['Ámbito Financiero · Observatorio PyME / Min. de Economía', 'https://www.ambito.com/economia/radiografia-pyme-como-se-conforma-la-estructura-productiva-argentina-n5949821'],
+        ],
+      },
+      {
+        n: '~4%',
+        label: 'del financiamiento PyME llega por el mercado de capitales; el resto depende del crédito bancario.',
+        sources: [
+          ['CONICET · Financiamiento PyME en el mercado de capitales', 'https://ri.conicet.gov.ar/bitstream/handle/11336/266795/CONICET_Digital_Nro.38ddbf19-92a3-47e7-a424-9f1e60a56400_B.pdf?sequence=2'],
+        ],
+      },
+      {
+        n: 'US$200B',
+        label: 'en ahorros de argentinos fuera del sistema financiero — capital que no llega a las empresas.',
+        sources: [
+          ['La Nación (16/08/2026)', 'https://www.lanacion.com.ar/editoriales/existe-un-rigi-para-el-conurbano-nid16082026/'],
+          ['Forbes Argentina · entrevista BCG', 'https://www.forbesargentina.com/money/bancos-argentina-mercado-mayor-potencial-bcg-n95342'],
+        ],
+      },
+    ],
+    note: 'Emitir una ON tradicional suma comisión de garantía (SGR), comisión de colocación (ALyC), honorarios legales y contables y gastos de mercado — una estructura de costos que, según estudios como PAGBAM y el relevamiento de Neuquén21, deja fuera a la mayoría de las PyMEs. Nuestro trabajo es bajar esa barrera.',
+  },
+  valuation: {
+    kicker: 'Investigación propia',
+    title: 'El equity privado argentino que hoy no puede cotizar',
+    lead: 'Las empresas públicas tienen un precio de mercado observable todos los días. Las privadas no. Para dimensionar lo que queda fuera de la bolsa construimos un modelo de valuación de capital cerrado: flujos de caja descontados a nivel macro, con prima de riesgo país y descuento por falta de liquidez.',
+    resultN: '~US$72B',
+    resultLabel: 'valor estimado del equity de las PyMEs y empresas de capital cerrado argentinas',
+    resultRange: 'Rango robusto: US$60.000–90.000 millones',
+    resultNote: 'Escenario base del modelo. No es un precio de mercado — es una valuación intrínseca estimada con metodología estándar (Damodaran, NYU Stern).',
+    contextTitle: 'El ecosistema, en contexto',
+    context: [
+      ['273.176', 'empresas empleadoras con fines de lucro registradas (CNE 2020-2021, INDEC). El 99% son PyMEs.'],
+      ['~40% del PBI', 'generan las PyMEs argentinas, sosteniendo más de la mitad del empleo formal (CEPAL / CAME).'],
+      ['9% del PBI', 'es la capitalización bursátil argentina — contra ~50% el promedio latinoamericano, 83% Chile y 76% Brasil.'],
+      ['US$1,8B', 'es la brecha de financiamiento PyME en América Latina (MSME Finance Gap, IFC / Banco Mundial).'],
+    ],
+    modelTitle: 'El modelo: del PBI al valor de equity',
+    modelSteps: [
+      ['PBI nominal estabilizado', 'US$500.000M', 'Proxy de consenso macroeconómico internacional.'],
+      ['Contribución PyME al PBI', '40%', 'CEPAL y entidades sectoriales.'],
+      ['Valor agregado anual', 'US$200.000M', 'Derivación directa de la participación en el PBI.'],
+      ['Margen de flujo de caja libre', '12%', 'Descuento por presión fiscal, salarios y CapEx recurrente.'],
+      ['FCFF agregado', 'US$24.000M', 'Base de efectivo operativo descontable.'],
+      ['WACC en USD', '27%', 'CAPM + Country Risk Premium de 18,21% (Moody\u2019s Ca — datafile Damodaran).'],
+      ['Crecimiento a perpetuidad (g)', '2%', 'Expectativa de crecimiento real a larguísimo plazo.'],
+      ['Enterprise Value teórico', 'US$96.000M', 'FCFF / (WACC − g) = US$24.000M / 25%.'],
+      ['DLOM (−25%)', '× 0,75', 'Descuento por falta de comerciabilidad: consenso académico 20–30%.'],
+      ['Equity value estimado', '~US$72.000M', 'Cifra final del modelo — el mercado potencial.'],
+    ],
+    whyTitle: 'Por qué el descuento es tan grande',
+    whyCards: [
+      ['Riesgo país', 'La prima de riesgo país argentina (18,21%) lleva el costo de capital por encima del 25–30% en dólares. A esa tasa, los múltiplos implícitos quedan en ~4x flujo de caja.'],
+      ['Iliquidez (DLOM)', 'Una acción privada no se vende en pantalla: meses de due diligence, pocos compradores, asimetrías de información. La literatura descuenta 20–30% del valor intrínseco.'],
+      ['Informalidad', 'La subdeclaración de ingresos deprime los márgenes declarados y amplifica el DLOM: el capital institucional no puede auditar flujos no comprobables.'],
+    ],
+    catalystTitle: 'Qué puede revaluar ese equity',
+    catalyst: 'El RIGI proyecta más de US$150.000 millones de inversión en infraestructura e hidrocarburos que traccionarían la cadena de proveedores PyME. Si el riesgo país se comprime hacia estándares regionales, la sola matemática del descuento de flujos provoca un repricing: el ecosistema podría duplicar su valuación teórica. Liquidez + menor riesgo = más valor.',
+    sourcesTitle: 'Fuentes y metodología',
+    sourcesNote: 'La investigación completa, los supuestos y todas las referencias están agrupados abajo. El modelo es una estimación propia con metodología académica estándar — no una auditoría ni un precio observado.',
+    backHome: '← Volver al inicio',
   },
   merval: {
     kicker: 'Renta variable y deuda',
@@ -169,6 +271,7 @@ const es = {
       ['OPA on-chain', 'OPA al 50% y squeeze-out al 95%: operá en la blockchain con las mismas reglas y seguridad que en un mercado tradicional.'],
     ],
     burst: 'Burst loan',
+    builderChallenge: 'Ganadores del Argentina Builder Challenge',
   },
   partners: {
     kicker: 'Building blocks',
@@ -744,6 +847,7 @@ const es = {
     saveSettle: 'Guardar cuándo se reparte',
     finalizeOnchain: 'Finalizar on-chain (hard cap o deadline)',
     closeNow: 'Cerrar ahora (mínimo {n} USDC)',
+    publishMarket: 'Publicar mercado',
     publicPage: 'Ver ficha pública',
     payDividend: 'Pagar dividendo',
     proRata: 'USDC, pro-rata entre tenedores',
@@ -807,7 +911,7 @@ const es = {
     },
     'caja-de-valores': {
       role: 'Depositario Central de Valores',
-      description: 'Custodia institucional segregada 1:1 en subcuenta comitente oficial (Subcuenta N° 84920).',
+      description: 'Depósito colectivo del mercado argentino: las acciones subyacentes de los tokens Merval se referencian 1:1 en subcuenta comitente.',
       badge: 'Custodia Colectiva',
     },
     solana: {
@@ -1143,9 +1247,9 @@ const en: Messages = {
   },
   home: {
     badge: 'Colosseum · Superteam Argentina · Solana',
-    leadBefore: "Argentina's first",
-    leadStrong: 'crypto RWA market',
-    leadL1End: 'on Solana.',
+    leadBefore: "We want to be Argentina's first",
+    leadStrong: 'regulated crypto RWA market',
+    leadL1End: 'for real-world assets.',
     leadL2Pre: 'We connect the ',
     leadStrongCap: 'capital markets',
     leadL2Post: ' with companies in a fully traceable way,',
@@ -1239,7 +1343,7 @@ const en: Messages = {
   regulation: {
     kicker: 'Legal framework',
     title: 'CNV framework. Global investment. Designed for the sandbox.',
-    body: 'The design follows the CNV sandbox (RG 1150 / Law 26.831): each token is meant 1:1 with a real asset at Caja de Valores, with warrants under Law 9643 and forwards under the Civil Code. That authorization has not been granted. An investor in Madrid, Miami or São Paulo would use the same framework as an account holder in Buenos Aires.',
+    body: 'The design follows the CNV sandbox (RG 1150 / Law 26.831): each token is meant 1:1 with a real asset at Caja de Valores, with warrants under Law 9643 and forwards under the Civil Code. That authorization has not been granted. A foreign investor would go through the same journey as a local one: sign up with a passport or ID, pass the KYC/AML check with the UIF, fund the account in USDC and subscribe to the offering on-chain from any supported jurisdiction. The platform would not offer into the U.S. — onboarding would screen by jurisdiction.',
     cnv: 'National Securities Commission',
     cnvSub: 'Sandbox RG 1150 / 2026 · Law 26.831',
     caja: 'Caja de Valores S.A.',
@@ -1247,8 +1351,8 @@ const en: Messages = {
     stepsTitle: 'From idea to offering: 4 steps',
     steps: [
       ['Incorporate the company', 'A SAS or S.A. registered with the IGJ / provincial Public Registry operates the platform and holds every regulatory registration.'],
-      ['PSAV registration at the CNV', 'The Virtual Asset Service Provider registry (Law 27.739, RG 1058) authorizes custody, issuance and trading of tokens. It requires an AML/CFT program with the UIF, solvency, technical fitness and a Compliance Officer.'],
-      ['Financial trust', 'A public-offering fideicomiso under Law 26.831 and the CNV Sandbox (RG 1069/1081/1087/1150, in force until Dec 31, 2027), structured as a Global Program with independent Series so each new issuance gets cheaper.'],
+      ['Own PSAV + PCAB registration', 'We register ourselves as the Virtual Asset Service Provider (Law 27.739, RG 1058) and as our own custodian entity (PCAB). These registrations cannot be borrowed — a figurehead arrangement (prestanombre) would be illegal. Includes an AML/CFT program with the UIF, solvency, technical fitness and a Compliance Officer.'],
+      ['Our own financial trust', 'We constitute the fideicomiso ourselves: a public offering under Law 26.831 and the CNV Sandbox (RG 1069/1081/1087/1150, in force until Dec 31, 2027), structured as a Global Program with independent Series so each new issuance gets cheaper.'],
       ['Tokenization and issuance', 'The trust units —or the shares and bonds a client company issues inside a Series— become tokens on Solana, backed 1:1 by the custodied asset.'],
     ],
     cards: [
@@ -1256,6 +1360,108 @@ const en: Messages = {
       ['Any investor in the world', 'T+0 settlement on Solana. The rail is global; the security stays Argentine and custodied.'],
       ['One trust, many issuances', 'The Global Program issues independent Series; frequent issuance unlocks automatic CNV authorization (RG 1074/2025).'],
     ],
+  },
+  versus: {
+    kicker: 'Comparison',
+    title: 'Why Fractachain',
+    lead: 'Alternatives exist — but each one leaves someone out.',
+    cols: ['Fractachain', 'Ripio', 'Agrotoken', 'CNV crowdfunding (Alix)'],
+    rows: [
+      ['Tokenized SMEs and mid-caps', '✓', '—', '—', '—'],
+      ['Agro and RWA assets', '✓', '—', 'Grains only', '—'],
+      ['Retail investors (KYC only)', '✓', 'Partial', 'Closed: producers and suppliers', '—'],
+      ['On-chain settlement', '✓', 'Partial', 'Partial', '—'],
+      ['Secondary market with 24/7 liquidity', '✓', '—', '—', '—'],
+      ['Global investors', '✓', '—', 'Argentina only', '—'],
+      ['Your choice of custody (self or custodial)', '✓', '—', '—', '—'],
+    ],
+    note: 'Ripio tokenizes sovereign bonds and large-cap debt — SMEs and mid-caps are left out. Agrotoken is a closed grains circuit for producers and suppliers, Argentina only. Alix and CNV crowdfunding target large companies/IPOs, off-chain, no retail access. Fractachain brings it all together: any RWA, any verified investor, on-chain, with a secondary market.',
+    ndaLabel: 'Pipeline under NDA',
+    ndaText:
+      'We are in active conversations with companies and producers, but they are under non-disclosure agreements (NDA): we cannot share names, details or letters of intent. Confidentiality is strict — until formal announcements are made we cannot reveal more, but the conversations exist and are moving forward.',
+  },
+  marketStats: {
+    kicker: 'The problem, in numbers',
+    title: "Argentina's capital market is closed to almost everyone",
+    sourcePrefix: 'Sources:',
+    featured: {
+      n: '~US$72B',
+      label: 'of unlisted Argentine private equity — the estimated capitalization of the ~273,000 SMEs and closely-held companies that cannot list today.',
+      cta: 'See the full methodology →',
+    },
+    items: [
+      {
+        n: '78',
+        label: 'companies trade on BYMA — out of ~548,000 registered nationwide. Only 0.014% can reach the market.',
+        sources: [
+          ['Pulso by Gallo · BYMA index', 'https://data.gallofintech.com/acciones'],
+          ['Ámbito Financiero · SME landscape', 'https://www.ambito.com/economia/radiografia-pyme-como-se-conforma-la-estructura-productiva-argentina-n5949821'],
+        ],
+      },
+      {
+        n: '97.8%',
+        label: 'of Argentine companies are SMEs — the engine of employment sits outside capital-market funding.',
+        sources: [
+          ['Ámbito Financiero · SME Observatory / Min. of Economy', 'https://www.ambito.com/economia/radiografia-pyme-como-se-conforma-la-estructura-productiva-argentina-n5949821'],
+        ],
+      },
+      {
+        n: '~4%',
+        label: 'of SME financing comes through capital markets; the rest depends on bank credit.',
+        sources: [
+          ['CONICET · SME financing in the capital market', 'https://ri.conicet.gov.ar/bitstream/handle/11336/266795/CONICET_Digital_Nro.38ddbf19-92a3-47e7-a424-9f1e60a56400_B.pdf?sequence=2'],
+        ],
+      },
+      {
+        n: 'US$200B',
+        label: 'in Argentine savings sits outside the financial system — capital that never reaches companies.',
+        sources: [
+          ['La Nación (08/16/2026)', 'https://www.lanacion.com.ar/editoriales/existe-un-rigi-para-el-conurbano-nid16082026/'],
+          ['Forbes Argentina · BCG interview', 'https://www.forbesargentina.com/money/bancos-argentina-mercado-mayor-potencial-bcg-n95342'],
+        ],
+      },
+    ],
+    note: 'Issuing a traditional corporate bond adds a guarantee fee (SGR), a placement fee (ALyC), legal and accounting fees and market costs — a cost structure that, per studies like PAGBAM and the Neuquén21 review, prices most SMEs out. Our job is to lower that barrier.',
+  },
+  valuation: {
+    kicker: 'Our own research',
+    title: 'The Argentine private equity that cannot list today',
+    lead: 'Public companies get an observable market price every day. Private ones do not. To size what sits outside the exchange we built a closely-held valuation model: macro-level discounted cash flows, with a country risk premium and a discount for lack of marketability.',
+    resultN: '~US$72B',
+    resultLabel: 'estimated equity value of Argentine SMEs and closely-held companies',
+    resultRange: 'Robust range: US$60–90 billion',
+    resultNote: 'Base case of the model. Not a market price — an intrinsic valuation estimate built with standard methodology (Damodaran, NYU Stern).',
+    contextTitle: 'The ecosystem, in context',
+    context: [
+      ['273,176', 'for-profit employer companies registered (CNE 2020-2021, INDEC). 99% are SMEs.'],
+      ['~40% of GDP', 'is generated by Argentine SMEs, sustaining over half of formal employment (ECLAC / CAME).'],
+      ['9% of GDP', 'is Argentina\u2019s stock market capitalization — vs ~50% the LatAm average, 83% Chile and 76% Brazil.'],
+      ['US$1.8T', 'is the SME financing gap in Latin America (MSME Finance Gap, IFC / World Bank).'],
+    ],
+    modelTitle: 'The model: from GDP to equity value',
+    modelSteps: [
+      ['Stabilized nominal GDP', 'US$500B', 'International macro consensus proxy.'],
+      ['SME contribution to GDP', '40%', 'ECLAC and industry bodies.'],
+      ['Annual value added', 'US$200B', 'Direct derivation from GDP share.'],
+      ['Free cash flow margin', '12%', 'Net of tax pressure, wages and recurring CapEx.'],
+      ['Aggregate FCFF', 'US$24B', 'Discountable operating cash base.'],
+      ['WACC in USD', '27%', 'CAPM + 18.21% Country Risk Premium (Moody\u2019s Ca — Damodaran datafile).'],
+      ['Perpetuity growth (g)', '2%', 'Long-run real growth expectation.'],
+      ['Theoretical enterprise value', 'US$96B', 'FCFF / (WACC − g) = US$24B / 25%.'],
+      ['DLOM (−25%)', '× 0.75', 'Discount for lack of marketability: 20–30% academic consensus.'],
+      ['Estimated equity value', '~US$72B', 'The model\u2019s final figure — the potential market.'],
+    ],
+    whyTitle: 'Why the discount is so large',
+    whyCards: [
+      ['Country risk', 'Argentina\u2019s country risk premium (18.21%) pushes the cost of capital above 25–30% in USD. At that rate, implied multiples compress to ~4x cash flow.'],
+      ['Illiquidity (DLOM)', 'A private share cannot be sold on a screen: months of due diligence, few buyers, information asymmetry. The literature discounts 20–30% off intrinsic value.'],
+      ['Informality', 'Income underreporting depresses declared margins and amplifies the DLOM: institutional capital cannot audit unverifiable cash flows.'],
+    ],
+    catalystTitle: 'What could reprice that equity',
+    catalyst: 'The RIGI regime projects over US$150 billion of infrastructure and hydrocarbon investment that would pull the SME supplier chain. If country risk compresses toward regional standards, discounted-cash-flow math alone triggers a repricing: the ecosystem could double its theoretical valuation. Liquidity + lower risk = more value.',
+    sourcesTitle: 'Sources and methodology',
+    sourcesNote: 'The full research, assumptions and every reference are grouped below. The model is our own estimate built on standard academic methodology — not an audit or an observed price.',
+    backHome: '← Back to home',
   },
   merval: {
     kicker: 'Equities and debt',
@@ -1275,6 +1481,7 @@ const en: Messages = {
       ['On-chain tender', 'Tender offer at 50%, squeeze-out at 95%: trade on-chain with the same rules and security as a traditional market.'],
     ],
     burst: 'Burst loan',
+    builderChallenge: 'Argentina Builder Challenge winners',
   },
   partners: {
     kicker: 'Building blocks',
@@ -1849,6 +2056,7 @@ const en: Messages = {
     saveSettle: 'Save distribution timing',
     finalizeOnchain: 'Finalize on-chain (hard cap or deadline)',
     closeNow: 'Close now (minimum {n} USDC)',
+    publishMarket: 'Publish market',
     publicPage: 'View public page',
     payDividend: 'Pay dividend',
     proRata: 'USDC, pro-rata across holders',
@@ -1912,7 +2120,7 @@ const en: Messages = {
     },
     'caja-de-valores': {
       role: 'Central Securities Depository',
-      description: 'Segregated 1:1 institutional custody in an official comitente subaccount (Subaccount No. 84920).',
+      description: 'The Argentine market\u2019s collective depository: shares underlying the Merval tokens are referenced 1:1 in a comitente subaccount.',
       badge: 'Collective Custody',
     },
     solana: {
@@ -2232,10 +2440,10 @@ function lookupIn(messages: Messages, key: string): string | undefined {
 
 /**
  * Locale-aware translate for non-React modules (errors thrown in lib code).
- * Reads the same fc_lang localStorage/cookie the I18nContext uses; ES by default.
+ * Reads the same fc_lang localStorage/cookie the I18nContext uses; EN by default.
  */
 export function tClient(key: string, vars?: Record<string, string | number>): string {
-  let locale: Locale = 'es';
+  let locale: Locale = 'en';
   if (typeof window !== 'undefined') {
     const saved = window.localStorage.getItem('fc_lang');
     const cookie = document.cookie.match(/(?:^|; )fc_lang=(\w+)/)?.[1];
