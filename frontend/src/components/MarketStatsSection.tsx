@@ -23,7 +23,22 @@ export default function MarketStatsSection() {
               {item.n}
             </div>
             <p className="text-xs sm:text-sm text-neutral-700 leading-snug">{item.label}</p>
-            <p className="text-[10px] text-neutral-400 leading-snug">{item.source}</p>
+            <p className="text-[10px] text-neutral-400 leading-snug">
+              {s.sourcePrefix}{' '}
+              {item.sources.map(([name, url], i) => (
+                <span key={url}>
+                  {i > 0 && ' · '}
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline decoration-dotted underline-offset-2 hover:text-neutral-600"
+                  >
+                    {name}
+                  </a>
+                </span>
+              ))}
+            </p>
           </div>
         ))}
       </div>

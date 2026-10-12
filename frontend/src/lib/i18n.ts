@@ -173,26 +173,37 @@ const es = {
   marketStats: {
     kicker: 'El problema, en números',
     title: 'El mercado de capitales argentino está cerrado para casi todos',
+    sourcePrefix: 'Fuentes:',
     items: [
       {
         n: '78',
         label: 'empresas cotizan en BYMA — de ~548.000 registradas en el país. Solo el 0,014% accede al mercado.',
-        source: 'Fuente: Pulso by Gallo / BYMA (oct. 2026) · Min. de Economía vía Ámbito Financiero',
+        sources: [
+          ['Pulso by Gallo · índice BYMA', 'https://data.gallofintech.com/acciones'],
+          ['Ámbito Financiero · radiografía PyME', 'https://www.ambito.com/economia/radiografia-pyme-como-se-conforma-la-estructura-productiva-argentina-n5949821'],
+        ],
       },
       {
         n: '97,8%',
         label: 'de las empresas argentinas son PyMEs — el motor del empleo queda afuera del financiamiento bursátil.',
-        source: 'Fuente: Observatorio PyME, Ministerio de Economía',
+        sources: [
+          ['Ámbito Financiero · Observatorio PyME / Min. de Economía', 'https://www.ambito.com/economia/radiografia-pyme-como-se-conforma-la-estructura-productiva-argentina-n5949821'],
+        ],
       },
       {
         n: '~4%',
         label: 'del financiamiento PyME llega por el mercado de capitales; el resto depende del crédito bancario.',
-        source: 'Fuente: CNV / CONICET',
+        sources: [
+          ['CONICET · Financiamiento PyME en el mercado de capitales', 'https://ri.conicet.gov.ar/bitstream/handle/11336/266795/CONICET_Digital_Nro.38ddbf19-92a3-47e7-a424-9f1e60a56400_B.pdf?sequence=2'],
+        ],
       },
       {
         n: 'US$200B',
         label: 'en ahorros de argentinos fuera del sistema financiero — capital que no llega a las empresas.',
-        source: 'Fuente: La Nación · estimación BCG vía Forbes Argentina',
+        sources: [
+          ['La Nación (16/08/2026)', 'https://www.lanacion.com.ar/editoriales/existe-un-rigi-para-el-conurbano-nid16082026/'],
+          ['Forbes Argentina · entrevista BCG', 'https://www.forbesargentina.com/money/bancos-argentina-mercado-mayor-potencial-bcg-n95342'],
+        ],
       },
     ],
     note: 'Emitir una ON tradicional suma comisión de garantía (SGR), comisión de colocación (ALyC), honorarios legales y contables y gastos de mercado — una estructura de costos que, según estudios como PAGBAM y el relevamiento de Neuquén21, deja fuera a la mayoría de las PyMEs. Nuestro trabajo es bajar esa barrera.',
@@ -1327,26 +1338,37 @@ const en: Messages = {
   marketStats: {
     kicker: 'The problem, in numbers',
     title: "Argentina's capital market is closed to almost everyone",
+    sourcePrefix: 'Sources:',
     items: [
       {
         n: '78',
         label: 'companies trade on BYMA — out of ~548,000 registered nationwide. Only 0.014% can reach the market.',
-        source: 'Source: Pulso by Gallo / BYMA (Oct 2026) · Min. of Economy via Ámbito Financiero',
+        sources: [
+          ['Pulso by Gallo · BYMA index', 'https://data.gallofintech.com/acciones'],
+          ['Ámbito Financiero · SME landscape', 'https://www.ambito.com/economia/radiografia-pyme-como-se-conforma-la-estructura-productiva-argentina-n5949821'],
+        ],
       },
       {
         n: '97.8%',
         label: 'of Argentine companies are SMEs — the engine of employment sits outside capital-market funding.',
-        source: 'Source: SME Observatory, Ministry of Economy',
+        sources: [
+          ['Ámbito Financiero · SME Observatory / Min. of Economy', 'https://www.ambito.com/economia/radiografia-pyme-como-se-conforma-la-estructura-productiva-argentina-n5949821'],
+        ],
       },
       {
         n: '~4%',
         label: 'of SME financing comes through capital markets; the rest depends on bank credit.',
-        source: 'Source: CNV / CONICET',
+        sources: [
+          ['CONICET · SME financing in the capital market', 'https://ri.conicet.gov.ar/bitstream/handle/11336/266795/CONICET_Digital_Nro.38ddbf19-92a3-47e7-a424-9f1e60a56400_B.pdf?sequence=2'],
+        ],
       },
       {
         n: 'US$200B',
         label: 'in Argentine savings sits outside the financial system — capital that never reaches companies.',
-        source: 'Source: La Nación · BCG estimate via Forbes Argentina',
+        sources: [
+          ['La Nación (08/16/2026)', 'https://www.lanacion.com.ar/editoriales/existe-un-rigi-para-el-conurbano-nid16082026/'],
+          ['Forbes Argentina · BCG interview', 'https://www.forbesargentina.com/money/bancos-argentina-mercado-mayor-potencial-bcg-n95342'],
+        ],
       },
     ],
     note: 'Issuing a traditional corporate bond adds a guarantee fee (SGR), a placement fee (ALyC), legal and accounting fees and market costs — a cost structure that, per studies like PAGBAM and the Neuquén21 review, prices most SMEs out. Our job is to lower that barrier.',
