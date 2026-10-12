@@ -39,7 +39,7 @@ export default function GoogleLoginButton({
       onClick={handleLogin}
       className={`flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl font-medium text-xs transition-all shadow-sm transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed ${
         variant === 'light'
-          ? 'bg-white hover:bg-gray-50 text-gray-800 border border-gray-300 shadow-md'
+          ? 'bg-gray-600 hover:bg-gray-500 text-white border border-gray-500 shadow-md'
           : 'bg-[#141b2c] hover:bg-[#1a2338] text-white border border-gray-700/80 shadow-inner'
       } ${className}`}
     >

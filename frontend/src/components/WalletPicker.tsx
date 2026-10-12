@@ -97,7 +97,7 @@ export default function WalletPicker({
               href={w.url}
               target="_blank"
               rel="noreferrer"
-              className="rounded-full border border-black/15 px-3 py-1.5 text-xs font-bold hover:bg-black/[0.04]"
+              className="rounded-full border border-gray-500 bg-gray-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-gray-500"
             >
               {w.name}
             </a>
@@ -118,13 +118,13 @@ export default function WalletPicker({
             type="button"
             disabled={Boolean(pending)}
             onClick={() => choose(w.adapter.name)}
-            className="w-full flex items-center gap-3 rounded-xl border border-black/10 bg-white px-4 py-3 text-sm font-bold hover:border-black/30 disabled:opacity-60 transition"
+            className="w-full flex items-center gap-3 rounded-xl border border-gray-500 bg-gray-600 text-white px-4 py-3 text-sm font-bold hover:bg-gray-500 disabled:opacity-60 transition"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={w.adapter.icon} alt="" className="h-6 w-6 rounded" />
             <span className="flex-1 text-left">{w.adapter.name}</span>
             {isPending && (
-              <span className="text-xs font-normal text-black/50">
+              <span className="text-xs font-normal text-white/70">
                 {busy ? t('acct.signing') : t('acct.connecting')}
               </span>
             )}
@@ -141,7 +141,7 @@ export default function WalletPicker({
                 href={w.url}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-full border border-black/15 px-3 py-1.5 text-xs font-bold hover:bg-black/[0.04]"
+                className="rounded-full border border-gray-500 bg-gray-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-gray-500"
               >
                 {w.name}
               </a>

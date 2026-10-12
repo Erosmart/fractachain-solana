@@ -48,7 +48,7 @@ function LoginInner() {
   return (
     <div className="mx-auto max-w-md py-10">
       <div className="rounded-3xl border border-brand-border bg-brand-card p-6 sm:p-8 shadow-sm">
-        <h1 className="font-serif italic text-3xl">{t('acct.loginTitle')}</h1>
+        <h1 className="font-serif italic text-3xl text-[#0a0a0a]">{t('acct.loginTitle')}</h1>
         <p className="mt-2 text-sm text-black/60">{t('acct.loginLead')}</p>
 
         <div className="mt-6">
@@ -92,7 +92,7 @@ function LoginInner() {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-xl bg-black text-white py-2.5 text-sm font-bold hover:bg-black/85 disabled:opacity-50"
+            className="w-full rounded-xl bg-gray-600 text-white py-2.5 text-sm font-bold hover:bg-gray-500 disabled:opacity-50"
           >
             {busy ? t('auth.entering') : t('auth.continue')}
           </button>
