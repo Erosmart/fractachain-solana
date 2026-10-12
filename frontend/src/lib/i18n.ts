@@ -141,7 +141,7 @@ const es = {
     stepsTitle: 'De la idea a la licitación: 4 pasos',
     steps: [
       ['Constitución de la sociedad', 'Una SAS o S.A. ante la IGJ / Registro Público provincial opera la plataforma y es titular de todas las inscripciones regulatorias.'],
-      ['Inscripción PSAV + PCAB propios', 'Nos constituimos nosotros mismos como Proveedor de Servicios de Activos Virtuales (Ley 27.739, RG 1058) y como nuestra propia entidad de custodia (PCAB). Son figuras intransferibles: nadie puede "prestarnos" su registro — eso sería un prestanombre, que es ilegal. Incluye programa AML/CFT ante la UIF, solvencia, idoneidad técnica y un Oficial de Cumplimiento.'],
+      ['Inscripción PSAV propia', 'Nos registramos nosotros mismos como Proveedor de Servicios de Activos Virtuales (Ley 27.739, RG 1058), lo que incluye la custodia de los activos de nuestros inversores. Es un registro intransferible: nadie puede "prestarnos" el suyo — eso sería un prestanombre, que es ilegal. Incluye programa AML/CFT ante la UIF, solvencia, idoneidad técnica y un Oficial de Cumplimiento.'],
       ['Fideicomiso financiero propio', 'Constituimos nosotros el fideicomiso con oferta pública bajo la Ley 26.831 y el Sandbox CNV (RG 1069/1081/1087/1150, vigente al 31/12/2027). Se estructura como Programa Global con Series independientes: cada emisión sucesiva sale más barata.'],
       ['Tokenización y emisión', 'Las cuotapartes del fideicomiso —o las acciones y bonos que una empresa emite dentro de una Serie— se representan como tokens en Solana, respaldados 1:1 por el activo custodiado.'],
     ],
@@ -1351,7 +1351,7 @@ const en: Messages = {
     stepsTitle: 'From idea to offering: 4 steps',
     steps: [
       ['Incorporate the company', 'A SAS or S.A. registered with the IGJ / provincial Public Registry operates the platform and holds every regulatory registration.'],
-      ['Own PSAV + PCAB registration', 'We register ourselves as the Virtual Asset Service Provider (Law 27.739, RG 1058) and as our own custodian entity (PCAB). These registrations cannot be borrowed — a figurehead arrangement (prestanombre) would be illegal. Includes an AML/CFT program with the UIF, solvency, technical fitness and a Compliance Officer.'],
+      ['Own PSAV registration', 'We register ourselves as a Virtual Asset Service Provider (Law 27.739, RG 1058), which covers custody of our investors\u2019 assets. This registration cannot be borrowed — a figurehead arrangement (prestanombre) would be illegal. Includes an AML/CFT program with the UIF, solvency, technical fitness and a Compliance Officer.'],
       ['Our own financial trust', 'We constitute the fideicomiso ourselves: a public offering under Law 26.831 and the CNV Sandbox (RG 1069/1081/1087/1150, in force until Dec 31, 2027), structured as a Global Program with independent Series so each new issuance gets cheaper.'],
       ['Tokenization and issuance', 'The trust units —or the shares and bonds a client company issues inside a Series— become tokens on Solana, backed 1:1 by the custodied asset.'],
     ],

@@ -73,9 +73,8 @@ Ripio tokenizes sovereign bonds and large-cap debt — SMEs and mid-caps are out
 
 We do not borrow anyone's license — a figurehead (prestanombre) arrangement would be illegal. The roadmap is to register **ourselves**:
 
-1. **PSAV** (Virtual Asset Service Provider) at the CNV — Law 27.739, RG 1058.
-2. **PCAB** — our own custody entity; custody can't be outsourced to a borrowed registration.
-3. **Our own fideicomiso** (financial trust) under Law 26.831 + CNV sandbox, as a Global Program with independent Series.
+1. **PSAV** (Virtual Asset Service Provider) at the CNV — Law 27.739, RG 1058. It covers custody of investors' assets, which can't be outsourced to a borrowed registration.
+2. **Our own fideicomiso** (financial trust) under Law 26.831 + CNV sandbox, as a Global Program with independent Series.
 
 ## Commercial pipeline — under NDA
 
