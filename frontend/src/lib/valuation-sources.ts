@@ -92,6 +92,20 @@ export const valuationSources: ValuationSourceGroup[] = [
     ],
   },
   {
+    category: { es: 'Costos de emisión y acceso al mercado', en: 'Issuance costs and market access' },
+    items: [
+      ['PAGBAM Abogados — Alternativas regulatorias para la emisión de ON (regímenes y topes)', 'https://pagbam.com/noticias/alternativas-regulatorias-para-la-emision-de-obligaciones-negociables/'],
+      ['Neuquén21 — Cómo emitir una ON PyME CNV Garantizada: requisitos, tope y cuánto cuesta', 'https://neuquen21.com.ar/liderazgo-y-estrategia/como-emitir-on-pyme-cnv-garantizada-neuquen-requisitos-2026/'],
+      ['Redalyc — Financiamiento mediante ON: el problema de ser PyME (simulación de costos, Gamero)', 'https://www.redalyc.org/pdf/3579/357933895005.pdf'],
+      ['InfoPymes — Emitir deuda ya no es solo para grandes empresas (comisión SGR 2–4% anual)', 'https://www.infopymes.com.ar/emitir-deuda-ya-no-es-solo-para-grandes-empresas-alternativas-de-las-pymes-para-acceder-a-fondos-mas-baratos/'],
+      ['CPN Gustavo Rojas — Sociedades de Garantía Recíproca (comisión ~3%)', 'https://www.rojas.com.ar/sociedades-de-garantia-reciproca/'],
+      ['Del Fino (UNC) — Financiamiento mediante ON (costos de servicios ~1,5% del monto)', 'https://marcelodelfino.net/files/II.pdf'],
+      ['Prospecto real — Collins S.A., ON PyME CNV Garantizada Bajo Impacto (desglose de gastos)', 'https://www.bst.com.ar/wp-content/uploads/2025/10/Collins-ON-Pyme-CNV-Bajo-Imp-Serie-I-Prospecto.pdf'],
+      ['Forbes Argentina — Por qué no hay más empresas que se animen a cotizar en la Bolsa local', 'https://www.forbesargentina.com/money/mercado-capitales-hay-mas-empresas-animen-cotizar-bolsa-local-n97299'],
+      ['La Nación — Claves del proceso para salir a bolsa en Wall Street (costos y plazos de una OPI)', 'https://www.lanacion.com.ar/estados-unidos/claves-del-proceso-para-salir-a-bolsa-en-wall-street-nid17052026/'],
+    ],
+  },
+  {
     category: { es: 'Prensa y contexto macro', en: 'Press and macro context' },
     items: [
       ['Bloomberg Línea — El mercado de capitales en Argentina, uno de los más chicos de la región', 'https://www.bloomberglinea.com/latinoamerica/argentina/el-mercado-de-capitales-en-argentina-uno-de-los-mas-chicos-de-la-region/'],

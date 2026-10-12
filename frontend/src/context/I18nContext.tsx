@@ -4,15 +4,17 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { useRouter } from 'next/navigation';
 import { dictionaries, interpolate, type Locale, type Messages } from '../lib/i18n';
 
-const LANG_COOKIE = 'fc_lang';
+// Session-scoped on purpose: every new visit starts in English; a language
+// switch only lasts for the current browser session.
+export const LANG_KEY = 'fc_lang_session';
 
 function readLangCookie(): Locale | null {
-  const m = document.cookie.match(new RegExp(`(?:^|; )${LANG_COOKIE}=(\\w+)`));
+  const m = document.cookie.match(new RegExp(`(?:^|; )${LANG_KEY}=(\\w+)`));
   return m?.[1] === 'en' ? 'en' : m?.[1] === 'es' ? 'es' : null;
 }
 
 function writeLangCookie(locale: Locale) {
-  document.cookie = `${LANG_COOKIE}=${locale}; path=/; max-age=31536000; SameSite=Lax`;
+  document.cookie = `${LANG_KEY}=${locale}; path=/; SameSite=Lax`;
 }
 
 type I18nCtx = {
@@ -50,7 +52,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const refreshed = useRef(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('fc_lang');
+    localStorage.removeItem('fc_lang');
+    document.cookie = 'fc_lang=; path=/; max-age=0';
+    const saved = sessionStorage.getItem(LANG_KEY);
     const cookie = readLangCookie();
     if (saved === 'en' || saved === 'es') setLocale(saved);
     // Keep the cookie in sync so server-rendered sections match the client.
@@ -66,7 +70,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem('fc_lang', locale);
+    sessionStorage.setItem(LANG_KEY, locale);
     document.documentElement.lang = locale;
   }, [locale, hydrated]);
 

@@ -122,7 +122,7 @@ const es = {
   issuer: {
     kicker: 'Para empresas',
     title: 'Tokenizá las acciones de tu empresa y levantá capital',
-    body: 'Cotizar en el Merval o BYMA exige costos y un tamaño que la mayoría de las empresas no alcanza: con nuestra estructura tu empresa sale a mercado sin esa barrera, bajo el mismo marco regulatorio CNV. Estructuramos el fideicomiso, tokenizamos tus acciones y te acompañamos de la licitación primaria al listado en el secundario.',
+    body: 'Cotizar en el Merval o BYMA exige costos y un tamaño que la mayoría de las empresas no alcanza: con nuestra estructura tu empresa sale a mercado sin esa barrera, bajo el mismo marco regulatorio CNV. Estructuramos el fideicomiso, tokenizamos tus acciones y te acompañamos de la licitación primaria al listado en el mercado secundario.',
     steps: [
       ['Estructurá tu fideicomiso', 'Armamos el fideicomiso para preparar la tokenización de tus acciones, cumpliendo la normativa CNV.'],
       ['Licitación primaria', 'Abrís tu licitación y los inversores suscriben con el expediente completo.'],
@@ -161,7 +161,7 @@ const es = {
       ['Activos agropecuarios y RWA', '✓', '—', 'Solo granos', '—'],
       ['Inversores minoristas (solo KYC)', '✓', 'Parcial', 'Cerrado: productores y proveedores', '—'],
       ['Liquidación on-chain', '✓', 'Parcial', 'Parcial', '—'],
-      ['Secundario con liquidez 24/7', '✓', '—', '—', '—'],
+      ['Mercado secundario con liquidez 24/7', '✓', '—', '—', '—'],
       ['Inversores globales', '✓', '—', 'Solo Argentina', '—'],
       ['Custodia a elección (self o custodial)', '✓', '—', '—', '—'],
     ],
@@ -806,7 +806,7 @@ const es = {
   admIss: {
     kicker: 'Salida a bolsa',
     title: 'Listar empresa, mintear y licitar',
-    lead: 'Pedimos el expediente completo, deployamos el vault, minteamos 1:1 contra Caja de Valores y abrimos la licitación primaria. Al cerrar con éxito, el USDC va a la wallet de cobro de la empresa. El secundario cotiza en el order book nativo de Solana, y solo opera quien tenga KYC aprobado.',
+    lead: 'Pedimos el expediente completo, deployamos el vault, minteamos 1:1 contra Caja de Valores y abrimos la licitación primaria. Al cerrar con éxito, el USDC va a la wallet de cobro de la empresa. El mercado secundario cotiza en el order book nativo de Solana, y solo opera quien tenga KYC aprobado.',
     sec1: '1. Expediente de la empresa',
     proceedsLabel: 'Wallet que cobra la licitación (obligatoria)',
     proceedsPh: 'base58 tesorería de la empresa',
@@ -1044,7 +1044,7 @@ const es = {
   demo: {
     title: 'Fractachain · Demo',
     badge: 'Solana devnet',
-    lead: 'Simulación completa del flujo RWA sobre Solana: emisión con dossier, licitación primaria, KYC y orderbook secundario estilo Manifest con tokens Token-2022 congelados hasta verificación.',
+    lead: 'Simulación completa del flujo RWA sobre Solana: emisión con dossier, licitación primaria, KYC y orderbook del mercado secundario estilo Manifest con tokens Token-2022 congelados hasta verificación.',
     reset: 'Reiniciar',
     resetConfirm: '¿Reiniciar todo el demo?',
     connect: 'Conectar Phantom (simulado)',
@@ -2015,7 +2015,7 @@ const en: Messages = {
   admIss: {
     kicker: 'Issuance',
     title: 'List a company, mint, and run the offering',
-    lead: 'We collect the full dossier, deploy the vault, mint 1:1 against Caja de Valores, and open the primary offering. On a successful close, the USDC goes to the company payout wallet. The secondary trades on the Solana native order book, and only KYC-approved accounts can trade.',
+    lead: 'We collect the full dossier, deploy the vault, mint 1:1 against Caja de Valores, and open the primary offering. On a successful close, the USDC goes to the company payout wallet. The secondary market trades on the Solana native order book, and only KYC-approved accounts can trade.',
     sec1: '1. Company dossier',
     proceedsLabel: 'Wallet that receives the offering (required)',
     proceedsPh: 'base58 company treasury',
@@ -2253,7 +2253,7 @@ const en: Messages = {
   demo: {
     title: 'Fractachain · Demo',
     badge: 'Solana devnet',
-    lead: 'Full simulation of the RWA flow on Solana: issuance with dossier, primary offering, KYC, and a Manifest-style secondary orderbook with Token-2022 tokens frozen until verification.',
+    lead: 'Full simulation of the RWA flow on Solana: issuance with dossier, primary offering, KYC, and a Manifest-style orderbook for the secondary market with Token-2022 tokens frozen until verification.',
     reset: 'Reset',
     resetConfirm: 'Reset the whole demo?',
     connect: 'Connect Phantom (simulated)',
@@ -2440,13 +2440,13 @@ function lookupIn(messages: Messages, key: string): string | undefined {
 
 /**
  * Locale-aware translate for non-React modules (errors thrown in lib code).
- * Reads the same fc_lang localStorage/cookie the I18nContext uses; EN by default.
+ * Reads the same session storage/cookie the I18nContext uses; EN by default.
  */
 export function tClient(key: string, vars?: Record<string, string | number>): string {
   let locale: Locale = 'en';
   if (typeof window !== 'undefined') {
-    const saved = window.localStorage.getItem('fc_lang');
-    const cookie = document.cookie.match(/(?:^|; )fc_lang=(\w+)/)?.[1];
+    const saved = window.sessionStorage.getItem('fc_lang_session');
+    const cookie = document.cookie.match(/(?:^|; )fc_lang_session=(\w+)/)?.[1];
     if (saved === 'en' || saved === 'es') locale = saved;
     else if (cookie === 'en' || cookie === 'es') locale = cookie;
   }
