@@ -2440,13 +2440,13 @@ function lookupIn(messages: Messages, key: string): string | undefined {
 
 /**
  * Locale-aware translate for non-React modules (errors thrown in lib code).
- * Reads the same fc_lang localStorage/cookie the I18nContext uses; EN by default.
+ * Reads the same session storage/cookie the I18nContext uses; EN by default.
  */
 export function tClient(key: string, vars?: Record<string, string | number>): string {
   let locale: Locale = 'en';
   if (typeof window !== 'undefined') {
-    const saved = window.localStorage.getItem('fc_lang');
-    const cookie = document.cookie.match(/(?:^|; )fc_lang=(\w+)/)?.[1];
+    const saved = window.sessionStorage.getItem('fc_lang_session');
+    const cookie = document.cookie.match(/(?:^|; )fc_lang_session=(\w+)/)?.[1];
     if (saved === 'en' || saved === 'es') locale = saved;
     else if (cookie === 'en' || cookie === 'es') locale = cookie;
   }
